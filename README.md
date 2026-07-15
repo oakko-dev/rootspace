@@ -10,14 +10,14 @@ pnpm dev
 bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3456](http://localhost:3456) with your browser to see the result.
 
 To enable the dashboard database status, add these variables to `.env.local`:
 
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=your-project-url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-NEXT_PUBLIC_SITE_URL=http://localhost:3000
+NEXT_PUBLIC_SITE_URL=http://localhost:3456
 ```
 
 Then open `/` to verify the server can reach your configured project, or `/login` to sign in with Supabase Auth.
