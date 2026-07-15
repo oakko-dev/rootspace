@@ -1,65 +1,94 @@
-import Image from "next/image";
+import Link from "next/link";
+import SupabaseStatusCard from "@/components/supabase-status-card";
+import { toolCatalog } from "@/lib/tool-catalog";
+import * as Icons from "lucide-react";
 
-export default function Home() {
+export const dynamic = "force-dynamic";
+
+export default async function Home() {
+  const readyTools = toolCatalog.filter((tool) => tool.status === "Ready");
+  const plannedTools = toolCatalog.filter((tool) => tool.status !== "Ready");
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.js file.
+    <>
+      <header className="grid gap-6 border-b border-[#343b2f] pb-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div>
+          <p className="font-mono text-xs font-bold uppercase tracking-[0.16em] text-[#65d9f2]">
+            rootspace / dashboard
+          </p>
+          <h1 className="mt-3 max-w-3xl text-4xl font-bold tracking-normal text-[#eef4e8] sm:text-5xl">
+            Personal tools wired into one fast console.
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          <p className="mt-4 max-w-2xl text-base leading-7 text-[#aab5a0]">
+            Open the daily utilities, check project connectivity, and keep
+            upcoming finance tools visible without leaving the grid.
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+        <section className="rounded-lg border border-[#343b2f] bg-[#1b1f18] p-4">
+          <p className="font-mono text-xs uppercase tracking-[0.14em] text-[#87917d]">
+            Tool inventory
+          </p>
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            <div className="rounded-lg border border-[#343b2f] bg-[#11130f] p-3">
+              <p className="font-mono text-xs uppercase text-[#87917d]">Ready</p>
+              <p className="mt-2 text-3xl font-bold text-[#f7c65b]">
+                {String(readyTools.length).padStart(2, "0")}
+              </p>
+            </div>
+            <div className="rounded-lg border border-[#343b2f] bg-[#11130f] p-3">
+              <p className="font-mono text-xs uppercase text-[#87917d]">Soon</p>
+              <p className="mt-2 text-3xl font-bold text-[#f7c65b]">
+                {String(plannedTools.length).padStart(2, "0")}
+              </p>
+            </div>
+          </div>
+        </section>
+      </header>
+
+      <SupabaseStatusCard />
+
+      <section className="grid gap-4 md:grid-cols-2">
+        {toolCatalog.map((tool) => {
+          const Icon = Icons[tool.icon] || Icons.HelpCircle;
+          const content = (
+            <article className="group h-full rounded-lg border border-[#343b2f] bg-[#1b1f18] p-5 transition hover:border-[#65d9f2]">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#20251d] text-[#87917d] transition group-hover:bg-[#65d9f2]/10 group-hover:text-[#65d9f2]">
+                    <Icon size={24} />
+                  </div>
+                  <h2 className="text-xl font-semibold text-[#eef4e8]">
+                    {tool.name}
+                  </h2>
+                </div>
+                <span
+                  className={`rounded-full px-2.5 py-1 font-mono text-xs font-bold ${
+                    tool.status === "Ready"
+                      ? "bg-[#65d9f2]/15 text-[#65d9f2]"
+                      : "bg-[#f7c65b]/15 text-[#f7c65b]"
+                  }`}
+                >
+                  {tool.status}
+                </span>
+              </div>
+              <p className="mt-4 text-sm leading-6 text-[#aab5a0]">
+                {tool.description}
+              </p>
+              <p className="mt-6 font-mono text-xs text-[#87917d]">
+                {tool.href ?? "queued"}
+              </p>
+            </article>
+          );
+
+          return tool.href ? (
+            <Link key={tool.name} href={tool.href} className="block">
+              {content}
+            </Link>
+          ) : (
+            <div key={tool.name}>{content}</div>
+          );
+        })}
+      </section>
+    </>
   );
 }
