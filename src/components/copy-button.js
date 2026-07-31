@@ -1,5 +1,8 @@
 "use client";
 
+import { Check, Copy } from "lucide-react";
+import { Button } from "@/components/ui/button";
+
 export default function CopyButton({
   copied,
   disabled = false,
@@ -7,31 +10,17 @@ export default function CopyButton({
   onClick,
 }) {
   return (
-    <button
+    <Button
       type="button"
       onClick={onClick}
-      className="rounded-md border border-[#343b2f] p-2 text-[#aab5a0] transition hover:border-[#65d9f2] hover:text-[#65d9f2] disabled:cursor-not-allowed disabled:opacity-50"
+      variant="ghost"
+      size="icon"
+      className="shrink-0 text-muted-foreground hover:text-primary"
       aria-label={label}
       title={label}
       disabled={disabled}
     >
-      {copied ? (
-        <span className="text-[11px] font-semibold">Copied</span>
-      ) : (
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 24 24"
-          className="h-4 w-4"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <rect x="9" y="9" width="13" height="13" rx="2" />
-          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-        </svg>
-      )}
-    </button>
+      {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+    </Button>
   );
 }

@@ -5,6 +5,10 @@ import { getCurrentUser } from "@/lib/supabase/server";
 export const metadata = {
   title: "Rootspace",
   description: "Personal tools for developer and life admin work.",
+  icons: {
+    icon: [{ url: "/favicon-white.svg", type: "image/svg+xml" }],
+    shortcut: "/favicon-white.svg",
+  },
 };
 
 export default async function RootLayout({ children }) {

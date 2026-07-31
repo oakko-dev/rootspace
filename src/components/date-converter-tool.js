@@ -3,8 +3,13 @@
 import { useMemo, useState } from "react";
 import { convertDateInput } from "@/lib/date-converter";
 import CopyButton from "@/components/copy-button";
+import { Alert } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
-const sampleInput = "2024-01-02T03:04:05.000Z";
+const sampleInput = "";
 
 export default function DateConverterTool() {
   const [input, setInput] = useState(sampleInput);
@@ -33,59 +38,55 @@ export default function DateConverterTool() {
   }
 
   return (
-    <section className="grid gap-5 rounded-lg border border-[#343b2f] bg-[#1b1f18] p-4 lg:grid-cols-[360px_1fr] lg:p-5">
-      <div className="flex flex-col gap-4">
-        <div>
-          <p className="font-mono text-sm font-semibold uppercase tracking-[0.16em] text-[#65d9f2]">
-            Tool 01
-          </p>
-          <h2 className="mt-2 text-2xl font-semibold text-[#eef4e8]">
-            Date converter
-          </h2>
-        </div>
+    <section className="grid gap-5 lg:grid-cols-[360px_1fr]">
+      <Card>
+        <CardHeader>
+          <CardTitle>Date converter</CardTitle>
+          <CardDescription>Parse ISO dates, natural date text, and Unix timestamps.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
 
-        <label className="flex flex-col gap-2 text-sm font-medium text-[#eef4e8]">
-          Date input
-          <input
+        <div className="space-y-2">
+          <Label htmlFor="date-input">Date input</Label>
+          <Input
+            id="date-input"
             value={input}
             onChange={(event) => setInput(event.target.value)}
-            className="min-h-11 rounded-md border border-[#394033] bg-[#11130f] px-3 py-2 font-mono text-sm text-[#eef4e8] outline-none transition placeholder:text-[#87917d] focus:border-[#65d9f2] focus:ring-2 focus:ring-[#65d9f2]/20"
+            className="font-mono"
             placeholder="ISO date, date text, Unix seconds, or Unix ms"
           />
-        </label>
+        </div>
 
         <div className="flex flex-wrap gap-2">
-          <button
+          <Button
             type="button"
             onClick={() => setInput(new Date().toISOString())}
-            className="rounded-md bg-[#c8ff65] px-3 py-2 text-sm font-semibold text-[#11130f] transition hover:bg-[#d8ff8c]"
           >
             Use now
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             onClick={() => setInput(sampleInput)}
-            className="rounded-md border border-[#394033] px-3 py-2 text-sm font-semibold text-[#aab5a0] transition hover:border-[#65d9f2] hover:text-[#65d9f2]"
+            variant="outline"
           >
             Reset sample
-          </button>
+          </Button>
         </div>
 
         {!result.ok ? (
-          <p className="rounded-md border border-[#f7c65b]/40 bg-[#f7c65b]/10 px-3 py-2 text-sm font-medium text-[#f7c65b]">
+          <Alert variant="warning">
             {result.error}
-          </p>
+          </Alert>
         ) : null}
-      </div>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-3 sm:grid-cols-2">
         {outputs.map(([label, value]) => (
-          <div
-            key={label}
-            className="rounded-md border border-[#343b2f] bg-[#11130f] p-3"
-          >
+          <Card key={label}>
+            <CardContent className="p-3">
             <div className="flex items-start justify-between gap-3">
-              <p className="font-mono text-xs font-semibold uppercase tracking-[0.14em] text-[#87917d]">
+              <p className="font-mono text-xs font-semibold uppercase text-muted-foreground">
                 {label}
               </p>
               <CopyButton
@@ -94,10 +95,11 @@ export default function DateConverterTool() {
                 onClick={() => handleCopy(`date-${label}`, value)}
               />
             </div>
-            <p className="mt-2 break-words font-mono text-sm text-[#eef4e8]">
+            <p className="mt-2 break-words font-mono text-sm text-foreground">
               {String(value)}
             </p>
-          </div>
+            </CardContent>
+          </Card>
         ))}
       </div>
     </section>

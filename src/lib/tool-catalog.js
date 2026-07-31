@@ -1,5 +1,13 @@
 export const toolCatalog = [
   {
+    name: "Bookmark",
+    status: "Ready",
+    description: "Synced collections and links for your browser start page.",
+    href: "/",
+    icon: "PanelsTopLeft",
+    authRequired: true,
+  },
+  {
     name: "Date converter",
     status: "Ready",
     description: "ISO, UTC, local time, Unix seconds, and Unix milliseconds.",
@@ -22,10 +30,11 @@ export const toolCatalog = [
   },
   {
     name: "Financial planner",
-    status: "Soon",
-    description: "Budget snapshots and monthly planning.",
-    href: null,
+    status: "Ready",
+    description: "Budget snapshots, income tracking, and monthly planning.",
+    href: "/financial-planner",
     icon: "Wallet",
+    authRequired: true,
   },
   {
     name: "Installment logs",

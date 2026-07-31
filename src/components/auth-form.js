@@ -1,65 +1,91 @@
 "use client";
 
-import { useActionState } from "react";
+import { useState } from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
 import { signIn } from "@/app/auth/actions";
+import { Alert } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Form, FormControl, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
 
-const initialState = { status: "idle", message: "" };
+const signInSchema = z.object({
+  email: z.email("Enter a valid email address.").transform((value) => value.trim().toLowerCase()),
+  password: z.string().min(6, "Password must be at least 6 characters."),
+});
 
 export default function AuthForm() {
-  const [state, action, pending] = useActionState(signIn, initialState);
+  const [serverMessage, setServerMessage] = useState(null);
+  const form = useForm({
+    resolver: zodResolver(signInSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+  });
+
+  async function onSubmit(values) {
+    setServerMessage(null);
+
+    const formData = new FormData();
+    formData.set("email", values.email);
+    formData.set("password", values.password);
+
+    const result = await signIn(null, formData);
+    if (result?.message) {
+      setServerMessage(result);
+    }
+  }
 
   return (
-    <section className="rounded-lg border border-[#343b2f] bg-[#1b1f18] p-5">
-      <form action={action} className="space-y-4">
-        <div>
-          <label className="text-sm font-medium text-[#eef4e8]" htmlFor="email">
-            Email
-          </label>
-          <input
-            className="mt-2 w-full rounded-lg border border-[#343b2f] bg-[#11130f] px-3 py-2 text-[#eef4e8] outline-none transition placeholder:text-[#87917d] focus:border-[#65d9f2]"
-            id="email"
-            name="email"
-            type="email"
-            autoComplete="email"
-            required
-          />
-        </div>
+    <Card>
+      <CardContent className="pt-5">
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormItem>
+              <FormLabel htmlFor="email">Email</FormLabel>
+              <FormControl>
+                <Input
+                  id="email"
+                  type="email"
+                  autoComplete="email"
+                  {...form.register("email")}
+                />
+              </FormControl>
+              <FormMessage name="email" />
+            </FormItem>
 
-        <div>
-          <label className="text-sm font-medium text-[#eef4e8]" htmlFor="password">
-            Password
-          </label>
-          <input
-            className="mt-2 w-full rounded-lg border border-[#343b2f] bg-[#11130f] px-3 py-2 text-[#eef4e8] outline-none transition placeholder:text-[#87917d] focus:border-[#65d9f2]"
-            id="password"
-            name="password"
-            type="password"
-            autoComplete="current-password"
-            minLength={6}
-            required
-          />
-        </div>
+            <FormItem>
+              <FormLabel htmlFor="password">Password</FormLabel>
+              <FormControl>
+                <Input
+                  id="password"
+                  type="password"
+                  autoComplete="current-password"
+                  {...form.register("password")}
+                />
+              </FormControl>
+              <FormMessage name="password" />
+            </FormItem>
 
-        {state.message ? (
-          <p
-            className={`rounded-lg border px-3 py-2 text-sm ${
-              state.status === "success"
-                ? "border-[#2f7b57] bg-[#76efaa]/10 text-[#76efaa]"
-                : "border-[#7b3b2f] bg-[#ff8f7a]/10 text-[#ff8f7a]"
-            }`}
-          >
-            {state.message}
-          </p>
-        ) : null}
+            {serverMessage?.message ? (
+              <Alert variant={serverMessage.status === "success" ? "success" : "destructive"}>
+                {serverMessage.message}
+              </Alert>
+            ) : null}
 
-        <button
-          className="w-full rounded-lg bg-[#c8ff65] px-4 py-2.5 text-sm font-bold text-[#11130f] transition hover:bg-[#d8ff8a] disabled:cursor-not-allowed disabled:opacity-60"
-          disabled={pending}
-          type="submit"
-        >
-          {pending ? "Working..." : "Sign in"}
-        </button>
-      </form>
-    </section>
+            <Button
+              className="w-full"
+              disabled={form.formState.isSubmitting}
+              type="submit"
+            >
+              {form.formState.isSubmitting ? "Working..." : "Sign in"}
+            </Button>
+          </form>
+        </Form>
+      </CardContent>
+    </Card>
   );
 }

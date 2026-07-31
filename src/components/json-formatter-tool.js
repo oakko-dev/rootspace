@@ -3,8 +3,13 @@
 import { useState } from "react";
 import CopyButton from "@/components/copy-button";
 import { formatJson } from "@/lib/json-formatter";
+import { Alert } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
-const sampleInput = '{"name":"oak","tools":["date","json"],"active":true}';
+const sampleInput = "";
 
 export default function JsonFormatterTool() {
   const [input, setInput] = useState(sampleInput);
@@ -41,54 +46,52 @@ export default function JsonFormatterTool() {
   }
 
   return (
-    <section className="grid gap-5 rounded-lg border border-[#343b2f] bg-[#1b1f18] p-4 lg:grid-cols-[360px_1fr] lg:p-5">
-      <div className="flex flex-col gap-4">
-        <div>
-          <p className="font-mono text-sm font-semibold uppercase tracking-[0.16em] text-[#65d9f2]">
-            Tool 03
-          </p>
-          <h2 className="mt-2 text-2xl font-semibold text-[#eef4e8]">
-            JSON formatter
-          </h2>
-        </div>
+    <section className="grid gap-5 lg:grid-cols-[360px_1fr]">
+      <Card>
+        <CardHeader>
+          <CardTitle>JSON formatter</CardTitle>
+          <CardDescription>Pretty-print or minify JSON without leaving the browser.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
 
-        <label className="flex flex-col gap-2 text-sm font-medium text-[#eef4e8]">
-          JSON input
-          <textarea
+        <div className="space-y-2">
+          <Label htmlFor="json-input">JSON input</Label>
+          <Textarea
+            id="json-input"
             value={input}
             onChange={(event) => setInput(event.target.value)}
-            className="min-h-56 rounded-md border border-[#394033] bg-[#11130f] px-3 py-2 font-mono text-sm text-[#eef4e8] outline-none transition placeholder:text-[#87917d] focus:border-[#65d9f2] focus:ring-2 focus:ring-[#65d9f2]/20"
+            className="min-h-56 font-mono"
             placeholder='{"name":"oak"}'
           />
-        </label>
+        </div>
 
         <div className="flex flex-wrap gap-2">
-          <button
+          <Button
             type="button"
             onClick={() => handleFormat("pretty")}
-            className="rounded-md bg-[#c8ff65] px-3 py-2 text-sm font-semibold text-[#11130f] transition hover:bg-[#d8ff8c]"
           >
             Pretty
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             onClick={() => handleFormat("minify")}
-            className="rounded-md border border-[#394033] px-3 py-2 text-sm font-semibold text-[#aab5a0] transition hover:border-[#65d9f2] hover:text-[#65d9f2]"
+            variant="outline"
           >
             Minify
-          </button>
+          </Button>
         </div>
 
         {error ? (
-          <p className="rounded-md border border-[#f7c65b]/40 bg-[#f7c65b]/10 px-3 py-2 text-sm font-medium text-[#f7c65b]">
+          <Alert variant="warning">
             {error}
-          </p>
+          </Alert>
         ) : null}
-      </div>
+        </CardContent>
+      </Card>
 
-      <div className="flex flex-col gap-3 rounded-md border border-[#343b2f] bg-[#11130f] p-3">
+      <Card className="flex flex-col gap-3 p-3">
         <div className="flex items-start justify-between gap-3">
-          <p className="font-mono text-xs font-semibold uppercase tracking-[0.14em] text-[#87917d]">
+          <p className="font-mono text-xs font-semibold uppercase text-muted-foreground">
             Output
           </p>
           <CopyButton
@@ -98,13 +101,13 @@ export default function JsonFormatterTool() {
             disabled={!output}
           />
         </div>
-        <textarea
+        <Textarea
           value={output}
           readOnly
-          className="min-h-72 rounded-md border border-[#343b2f] bg-[#171a14] px-3 py-2 font-mono text-sm text-[#eef4e8] outline-none placeholder:text-[#87917d]"
+          className="min-h-72 bg-background font-mono"
           placeholder="Formatted JSON will appear here."
         />
-      </div>
+      </Card>
     </section>
   );
 }

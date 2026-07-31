@@ -1,40 +1,58 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { signOut } from "@/app/auth/actions";
 import { toolCatalog } from "@/lib/tool-catalog";
 import * as Icons from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { clearBookmarkBoardCache } from "@/lib/bookmark-board-cache";
+import { cn } from "@/lib/utils";
 
 export default function AppShell({ children, currentUser }) {
   const pathname = usePathname();
-  const liveTools = toolCatalog.filter((tool) => tool.status === "Ready");
-  const navItems = [
-    { name: "Dashboard", href: "/", icon: "LayoutDashboard" },
-    ...liveTools,
-  ];
+  const isBookmarkPage = pathname === "/" || pathname === "/start-page";
+  const liveTools = toolCatalog.filter((tool) => {
+    if (tool.status !== "Ready") return false;
+    if (tool.authRequired && !currentUser) return false;
+    return true;
+  });
+  const navItems = liveTools;
 
   return (
-    <main className="min-h-screen bg-[#11130f] text-[#eef4e8] lg:p-4">
+    <main
+      className="min-h-screen bg-background text-foreground lg:p-4"
+      onContextMenu={(event) => event.preventDefault()}
+    >
       <div className="grid min-h-screen lg:min-h-[calc(100vh-32px)] lg:grid-cols-[280px_minmax(0,1fr)] lg:gap-4">
-        <aside className="border-[#343b2f] bg-[#1b1f18] text-[#eef4e8] shadow-2xl shadow-black/20 lg:sticky lg:top-4 lg:flex lg:h-[calc(100vh-32px)] lg:flex-col lg:rounded-xl lg:border">
-          <div className="border-b border-[#343b2f] p-3">
+        <aside className="border-border bg-card text-card-foreground shadow-2xl shadow-black/20 lg:sticky lg:top-4 lg:flex lg:h-[calc(100vh-32px)] lg:flex-col lg:rounded-lg lg:border">
+          <div className="border-b border-border p-3">
             <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#c8ff65] font-mono text-[11px] font-black text-[#11130f]">
-                RS
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary p-1.5">
+                <Image
+                  src="/logo.svg"
+                  alt=""
+                  width={28}
+                  height={24}
+                  priority
+                  className="h-full w-full object-contain"
+                />
               </div>
               <div className="min-w-0 flex-1">
                 <Link
                   href="/"
                   className="block truncate text-sm font-bold"
-                  aria-label="Rootspace dashboard"
+                  aria-label="Rootspace home"
                 >
                   Rootspace
                 </Link>
-                <p className="text-xs text-[#87917d]">
+                <p className="text-xs text-muted-foreground">
                   {liveTools.length} ready tools
                 </p>
               </div>
+              <Badge variant="secondary">v0.1</Badge>
             </div>
           </div>
 
@@ -51,16 +69,17 @@ export default function AppShell({ children, currentUser }) {
                   <Link
                     key={item.href}
                     href={item.href}
-                    className={`flex items-center gap-2 rounded-lg px-2.5 py-2 font-medium transition ${
+                    className={cn(
+                      "flex items-center gap-2 rounded-md px-2.5 py-2 font-medium transition-colors",
                       active
-                        ? "bg-[#c8ff65] text-[#11130f]"
-                        : "text-[#aab5a0] hover:bg-[#20251d] hover:text-[#65d9f2]"
-                    }`}
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                    )}
                   >
                     <Icon
                       size={18}
                       strokeWidth={active ? 2.5 : 2}
-                      className={active ? "text-[#11130f]" : "text-[#87917d]"}
+                      className={active ? "text-primary-foreground" : "text-muted-foreground"}
                     />
                     <span className="flex-1 truncate">{item.name}</span>
                   </Link>
@@ -70,32 +89,37 @@ export default function AppShell({ children, currentUser }) {
 
           </nav>
 
-          <div className="border-t border-[#343b2f] p-3">
+          <div className="border-t border-border p-3">
             <div className="flex items-center gap-2">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#c8ff65] font-mono text-xs font-black text-[#11130f]">
+              <div className="flex h-9 w-9 items-center justify-center rounded-md bg-secondary font-mono text-xs font-black text-secondary-foreground">
                 {currentUser ? "IN" : "RS"}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-[#eef4e8]">
+                <p className="truncate text-sm font-semibold text-foreground">
                   {currentUser?.email ?? "Guest"}
                 </p>
-                <p className="truncate text-xs text-[#87917d]">
+                <p className="truncate text-xs text-muted-foreground">
                   {currentUser ? "supabase session" : "not authenticated"}
                 </p>
               </div>
               {currentUser ? (
-                <form action={signOut}>
-                  <button
-                    className="flex items-center gap-1 rounded-md px-2 py-1 font-mono text-xs text-[#87917d] transition hover:bg-[#20251d] hover:text-[#65d9f2]"
+                <form
+                  action={signOut}
+                  onSubmit={() => clearBookmarkBoardCache(currentUser.id)}
+                >
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="font-mono text-xs text-muted-foreground"
                     type="submit"
                   >
                     <Icons.LogOut size={14} />
                     <span>out</span>
-                  </button>
+                  </Button>
                 </form>
               ) : (
                 <Link
-                  className="flex items-center gap-1 rounded-md px-2 py-1 font-mono text-xs text-[#87917d] transition hover:bg-[#20251d] hover:text-[#65d9f2]"
+                  className="inline-flex h-9 items-center gap-1 rounded-md px-3 font-mono text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
                   href="/login"
                 >
                   <Icons.LogIn size={14} />
@@ -106,7 +130,14 @@ export default function AppShell({ children, currentUser }) {
           </div>
         </aside>
 
-        <div className="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-6 px-4 py-5 sm:px-6 lg:px-8 lg:py-8">
+        <div
+          className={cn(
+            "flex w-full min-w-0 flex-col",
+            isBookmarkPage
+              ? "max-w-none"
+              : "max-w-none gap-6 px-4 py-5 sm:px-6 lg:px-8 lg:py-8",
+          )}
+        >
           {children}
         </div>
       </div>

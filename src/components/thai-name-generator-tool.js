@@ -3,6 +3,9 @@
 import { useState } from "react";
 import CopyButton from "@/components/copy-button";
 import { generateThaiName } from "@/lib/thai-name-generator";
+import { Alert } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function ThaiNameGeneratorTool() {
   const [thaiName, setThaiName] = useState(null);
@@ -51,43 +54,37 @@ export default function ThaiNameGeneratorTool() {
   }
 
   return (
-    <section className="grid gap-5 rounded-lg border border-[#343b2f] bg-[#1b1f18] p-4 lg:grid-cols-[360px_1fr] lg:p-5">
-      <div className="flex flex-col gap-4">
-        <div>
-          <p className="font-mono text-sm font-semibold uppercase tracking-[0.16em] text-[#65d9f2]">
-            Tool 02
-          </p>
-          <h2 className="mt-2 text-2xl font-semibold text-[#eef4e8]">
-            Thai name generator
-          </h2>
-        </div>
-
-        <p className="text-sm leading-6 text-[#aab5a0]">
-          Pick a random Thai full name and nickname from the local name list.
-        </p>
+    <section className="grid gap-5 lg:grid-cols-[360px_1fr]">
+      <Card>
+        <CardHeader>
+          <CardTitle>Thai name generator</CardTitle>
+          <CardDescription>Pick a random Thai full name and nickname from the local name list.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
 
         <div className="flex flex-wrap gap-2">
-          <button
+          <Button
             type="button"
             onClick={handleGenerateThaiName}
-            className="rounded-md bg-[#c8ff65] px-3 py-2 text-sm font-semibold text-[#11130f] transition hover:bg-[#d8ff8c] disabled:cursor-wait disabled:bg-[#87917d]"
             disabled={isLoadingThaiName}
           >
             {isLoadingThaiName ? "Generating..." : "Generate name"}
-          </button>
+          </Button>
         </div>
 
         {thaiNameError ? (
-          <p className="rounded-md border border-[#f7c65b]/40 bg-[#f7c65b]/10 px-3 py-2 text-sm font-medium text-[#f7c65b]">
+          <Alert variant="warning">
             {thaiNameError}
-          </p>
+          </Alert>
         ) : null}
-      </div>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <div className="rounded-md border border-[#343b2f] bg-[#11130f] p-3 sm:col-span-2">
+        <Card className="sm:col-span-2">
+          <CardContent className="p-3">
           <div className="flex items-start justify-between gap-3">
-            <p className="font-mono text-xs font-semibold uppercase tracking-[0.14em] text-[#87917d]">
+            <p className="font-mono text-xs font-semibold uppercase text-muted-foreground">
               Full name
             </p>
             <CopyButton
@@ -97,13 +94,15 @@ export default function ThaiNameGeneratorTool() {
               disabled={!thaiName?.fullName}
             />
           </div>
-          <p className="mt-2 break-words font-mono text-lg text-[#eef4e8]">
+          <p className="mt-2 break-words font-mono text-lg text-foreground">
             {thaiName?.fullName ?? "Click generate to create a Thai name."}
           </p>
-        </div>
-        <div className="rounded-md border border-[#343b2f] bg-[#11130f] p-3">
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-3">
           <div className="flex items-start justify-between gap-3">
-            <p className="font-mono text-xs font-semibold uppercase tracking-[0.14em] text-[#87917d]">
+            <p className="font-mono text-xs font-semibold uppercase text-muted-foreground">
               Nickname
             </p>
             <CopyButton
@@ -113,13 +112,15 @@ export default function ThaiNameGeneratorTool() {
               disabled={!thaiName?.nickname}
             />
           </div>
-          <p className="mt-2 break-words font-mono text-sm text-[#eef4e8]">
+          <p className="mt-2 break-words font-mono text-sm text-foreground">
             {thaiName?.nickname ?? "-"}
           </p>
-        </div>
-        <div className="rounded-md border border-[#343b2f] bg-[#11130f] p-3">
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-3">
           <div className="flex items-start justify-between gap-3">
-            <p className="font-mono text-xs font-semibold uppercase tracking-[0.14em] text-[#87917d]">
+            <p className="font-mono text-xs font-semibold uppercase text-muted-foreground">
               Citizen number
             </p>
             <CopyButton
@@ -131,13 +132,15 @@ export default function ThaiNameGeneratorTool() {
               disabled={!thaiName?.citizenNumber}
             />
           </div>
-          <p className="mt-2 break-words font-mono text-sm text-[#eef4e8]">
+          <p className="mt-2 break-words font-mono text-sm text-foreground">
             {thaiName?.citizenNumber ?? "-"}
           </p>
-        </div>
-        <div className="rounded-md border border-[#343b2f] bg-[#11130f] p-3">
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-3">
           <div className="flex items-start justify-between gap-3">
-            <p className="font-mono text-xs font-semibold uppercase tracking-[0.14em] text-[#87917d]">
+            <p className="font-mono text-xs font-semibold uppercase text-muted-foreground">
               Combined
             </p>
             <CopyButton
@@ -147,10 +150,11 @@ export default function ThaiNameGeneratorTool() {
               disabled={!thaiName?.displayName}
             />
           </div>
-          <p className="mt-2 break-words font-mono text-sm text-[#eef4e8]">
+          <p className="mt-2 break-words font-mono text-sm text-foreground">
             {thaiName?.displayName ?? "-"}
           </p>
-        </div>
+          </CardContent>
+        </Card>
       </div>
     </section>
   );
