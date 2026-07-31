@@ -2,6 +2,7 @@ import { after, NextResponse } from "next/server";
 import {
   backfillBookmarkFavicons,
   BookmarkBoardError,
+  createBookmarkBoardPayload,
   executeBookmarkBoardAction,
   loadBookmarkBoard,
   resolveBookmarkBoardContext,
@@ -34,12 +35,7 @@ export async function GET() {
     }
 
     return NextResponse.json(
-      {
-        version: board.version,
-        userId: board.userId,
-        collections: board.collections,
-        bookmarks: board.bookmarks,
-      },
+      createBookmarkBoardPayload(board, context.user),
       { headers: { "cache-control": "private, no-store" } },
     );
   } catch (error) {

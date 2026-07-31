@@ -1,7 +1,19 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import * as Icons from "lucide-react";
+import { useRouter } from "next/navigation";
+import {
+  ArrowLeft,
+  ArrowRight,
+  ClipboardPaste,
+  Download,
+  Edit3,
+  FolderPlus,
+  Globe2,
+  Plus,
+  Trash2,
+  Upload,
+} from "lucide-react";
 import {
   exportBookmarkBoard,
   filterBookmarkBoard,
@@ -12,12 +24,21 @@ import {
   parseBookmarkLines,
 } from "@/lib/bookmark-start-page";
 import {
+  clearBookmarkBoardCache,
   getBookmarkBoardCacheKey,
   parseBookmarkBoardCache,
   parseBookmarkBoardPayload,
   readBookmarkBoardCache,
   writeBookmarkBoardCache,
 } from "@/lib/bookmark-board-cache";
+import {
+  BOOKMARK_BOARD_USER_KEY,
+  announceBookmarkBoardUser,
+  clearBookmarkBoardUser,
+  parseBookmarkBoardUser,
+  readBookmarkBoardUser,
+  writeBookmarkBoardUser,
+} from "@/lib/bookmark-board-user";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -31,6 +52,13 @@ import { cn } from "@/lib/utils";
 
 const COLORS = ["#7dd3fc", "#86efac", "#fbbf24", "#f0abfc", "#f87171", "#a5b4fc"];
 
+class BookmarkBoardRequestError extends Error {
+  constructor(message, status) {
+    super(message);
+    this.status = status;
+  }
+}
+
 function createClientId() {
   return globalThis.crypto?.randomUUID?.() || String(Date.now());
 }
@@ -39,7 +67,10 @@ async function requestBookmarkBoard(url = "/api/bookmark-board", options) {
   const response = await fetch(url, { cache: "no-store", ...options });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(payload.message || "Bookmark board request failed.");
+    throw new BookmarkBoardRequestError(
+      payload.message || "Bookmark board request failed.",
+      response.status,
+    );
   }
   return payload;
 }
@@ -76,7 +107,7 @@ function BookmarkFavicon({ faviconUrl, title }) {
   const [hasFavicon, setHasFavicon] = useState(true);
 
   if (!faviconUrl || !hasFavicon) {
-    return <Icons.Globe2 aria-hidden="true" className="size-4 shrink-0 text-[#777985]" />;
+    return <Globe2 aria-hidden="true" className="size-4 shrink-0 text-[#777985]" />;
   }
 
   return (
@@ -95,8 +126,11 @@ function BookmarkFavicon({ faviconUrl, title }) {
   );
 }
 
-export default function BookmarkStartPageTool({ currentUser }) {
-  const user = currentUser;
+export default function BookmarkStartPageTool() {
+  const router = useRouter();
+  const [user, setUser] = useState(null);
+  const [verifiedUserId, setVerifiedUserId] = useState("");
+  const boardRequestRevision = useRef(0);
   const mutationRevision = useRef(0);
   const [collections, setCollections] = useState([]);
   const [bookmarks, setBookmarks] = useState([]);
@@ -129,9 +163,10 @@ export default function BookmarkStartPageTool({ currentUser }) {
     [collections, bookmarks],
   );
   const hasBoardData = collections.length > 0;
+  const canEdit = Boolean(user?.id && verifiedUserId === user.id);
 
   async function upsertCollections(nextCollections) {
-    if (!user || nextCollections.length === 0) return;
+    if (!canEdit || nextCollections.length === 0) return;
     await postBookmarkBoardAction({
       action: "upsert-collections",
       collections: nextCollections,
@@ -139,7 +174,7 @@ export default function BookmarkStartPageTool({ currentUser }) {
   }
 
   async function upsertBookmarks(nextBookmarks) {
-    if (!user || nextBookmarks.length === 0) return;
+    if (!canEdit || nextBookmarks.length === 0) return;
     await postBookmarkBoardAction({
       action: "upsert-bookmarks",
       bookmarks: nextBookmarks,
@@ -147,6 +182,7 @@ export default function BookmarkStartPageTool({ currentUser }) {
   }
 
   async function mutateBoard(callback, nextBoard) {
+    if (!canEdit) return;
     const revision = mutationRevision.current + 1;
     mutationRevision.current = revision;
     setSyncState("saving");
@@ -171,46 +207,105 @@ export default function BookmarkStartPageTool({ currentUser }) {
   }
 
   useEffect(() => {
-    async function loadBoard() {
+    let disposed = false;
+
+    async function loadBoard(hintedUserId = "") {
+      const requestRevision = boardRequestRevision.current + 1;
+      boardRequestRevision.current = requestRevision;
       const revisionAtStart = mutationRevision.current;
-      const cachedBoard = readBookmarkBoardCache(user.id);
+      const cachedBoard = hintedUserId ? readBookmarkBoardCache(hintedUserId) : null;
       const hasCachedBoard = Boolean(cachedBoard);
 
       if (cachedBoard) {
+        setUser({ id: hintedUserId, cached: true });
+        setVerifiedUserId("");
         setCollections(cachedBoard.collections);
         setBookmarks(cachedBoard.bookmarks);
         setLoading(false);
         setSyncState("syncing");
+      } else {
+        setUser(hintedUserId ? { id: hintedUserId, cached: true } : null);
+        setVerifiedUserId("");
+        setCollections([]);
+        setBookmarks([]);
+        setLoading(true);
+        setSyncState("syncing");
       }
 
       try {
-        if (!hasCachedBoard) setLoading(true);
         const payload = await requestBookmarkBoard();
-        const freshBoard = parseBookmarkBoardPayload(payload, user.id);
+        const authenticatedUser = payload.user;
+        if (!authenticatedUser || typeof authenticatedUser.id !== "string") {
+          throw new Error("Bookmark board user was invalid.");
+        }
+        const freshBoard = parseBookmarkBoardPayload(payload, authenticatedUser.id);
         if (!freshBoard) throw new Error("Bookmark board response was invalid.");
 
-        if (mutationRevision.current === revisionAtStart) {
+        if (
+          !disposed &&
+          boardRequestRevision.current === requestRevision &&
+          mutationRevision.current === revisionAtStart
+        ) {
+          setUser(authenticatedUser);
+          setVerifiedUserId(authenticatedUser.id);
           setCollections(freshBoard.collections);
           setBookmarks(freshBoard.bookmarks);
-          writeBookmarkBoardCache(user.id, freshBoard);
+          writeBookmarkBoardCache(authenticatedUser.id, freshBoard);
+          writeBookmarkBoardUser(authenticatedUser.id);
+          announceBookmarkBoardUser(authenticatedUser);
           setSyncState("idle");
+          setDbError(null);
         }
-        setDbError(null);
       } catch (error) {
-        if (hasCachedBoard) {
+        if (disposed || boardRequestRevision.current !== requestRevision) return;
+
+        if (error instanceof BookmarkBoardRequestError && error.status === 401) {
+          if (hintedUserId) clearBookmarkBoardCache(hintedUserId);
+          clearBookmarkBoardUser();
+          announceBookmarkBoardUser(null);
+          setUser(null);
+          setVerifiedUserId("");
+          setCollections([]);
+          setBookmarks([]);
+          router.replace("/login?next=/");
+        } else if (hasCachedBoard) {
           setSyncState("error");
         } else {
           setDbError(`Database error: ${error instanceof Error ? error.message : "Unknown error"}`);
         }
       } finally {
-        setLoading(false);
+        if (!disposed && boardRequestRevision.current === requestRevision) setLoading(false);
       }
     }
 
-    loadBoard();
-  }, [user.id]);
+    const cachedUser = readBookmarkBoardUser();
+    loadBoard(cachedUser?.userId);
+
+    function syncActiveUser(event) {
+      if (event.key !== BOOKMARK_BOARD_USER_KEY) return;
+      const nextUser = event.newValue ? parseBookmarkBoardUser(event.newValue) : null;
+      if (!nextUser) {
+        boardRequestRevision.current += 1;
+        setUser(null);
+        setVerifiedUserId("");
+        setCollections([]);
+        setBookmarks([]);
+        router.replace("/login?next=/");
+        return;
+      }
+      loadBoard(nextUser.userId);
+    }
+
+    window.addEventListener("storage", syncActiveUser);
+    return () => {
+      disposed = true;
+      window.removeEventListener("storage", syncActiveUser);
+    };
+  }, [router]);
 
   useEffect(() => {
+    if (!user?.id) return undefined;
+
     function syncCachedBoard(event) {
       if (event.key !== getBookmarkBoardCacheKey(user.id) || !event.newValue) return;
       const cachedBoard = parseBookmarkBoardCache(event.newValue, user.id);
@@ -221,7 +316,7 @@ export default function BookmarkStartPageTool({ currentUser }) {
 
     window.addEventListener("storage", syncCachedBoard);
     return () => window.removeEventListener("storage", syncCachedBoard);
-  }, [user.id]);
+  }, [user?.id]);
 
   useEffect(() => {
     if (!bookmarkMenu.open) return undefined;
@@ -246,6 +341,7 @@ export default function BookmarkStartPageTool({ currentUser }) {
   }, [bookmarkMenu.open]);
 
   function openCollectionDialog(collection = null) {
+    if (!canEdit) return;
     setFormError("");
     setCollectionForm({
       name: collection?.name || "",
@@ -256,6 +352,7 @@ export default function BookmarkStartPageTool({ currentUser }) {
   }
 
   function openBookmarkDialog(bookmark = null, collectionId = "") {
+    if (!canEdit) return;
     const targetCollectionId = bookmark?.collectionId || collectionId || collections[0]?.id || "";
     setFormError("");
     setTitleLookupState("idle");
@@ -313,12 +410,14 @@ export default function BookmarkStartPageTool({ currentUser }) {
   }
 
   function openPasteImportDialog() {
+    if (!canEdit) return;
     setFormError("");
     setImportText("");
     setImportDialog({ open: true, mode: "paste" });
   }
 
   function openJsonImportDialog() {
+    if (!canEdit) return;
     setFormError("");
     setImportText("");
     setImportDialog({ open: true, mode: "json" });
@@ -348,6 +447,7 @@ export default function BookmarkStartPageTool({ currentUser }) {
 
   async function saveCollection(event) {
     event.preventDefault();
+    if (!canEdit) return;
     const name = collectionForm.name.trim();
     if (!name) {
       setFormError("Collection name is required.");
@@ -375,6 +475,7 @@ export default function BookmarkStartPageTool({ currentUser }) {
   }
 
   async function deleteCollection(collection) {
+    if (!canEdit) return;
     if (collections.length <= 1) {
       alert("Keep at least one collection on the board.");
       return;
@@ -401,6 +502,7 @@ export default function BookmarkStartPageTool({ currentUser }) {
 
   async function saveBookmark(event) {
     event.preventDefault();
+    if (!canEdit) return;
     let normalizedUrl;
     let title = bookmarkForm.title.trim();
     let faviconUrl = bookmarkForm.faviconUrl;
@@ -444,6 +546,7 @@ export default function BookmarkStartPageTool({ currentUser }) {
   }
 
   async function deleteBookmark(bookmark) {
+    if (!canEdit) return;
     if (!confirm(`Delete "${bookmark.title}"?`)) return;
     const nextBookmarks = bookmarks.filter((item) => item.id !== bookmark.id);
     setBookmarks(nextBookmarks);
@@ -454,6 +557,7 @@ export default function BookmarkStartPageTool({ currentUser }) {
   }
 
   async function toggleFavorite(bookmark) {
+    if (!canEdit) return;
     const nextBookmark = { ...bookmark, isFavorite: !bookmark.isFavorite };
     const nextBookmarks = bookmarks.map((item) => (item.id === bookmark.id ? nextBookmark : item));
     setBookmarks(nextBookmarks);
@@ -464,6 +568,7 @@ export default function BookmarkStartPageTool({ currentUser }) {
   }
 
   async function reorderCollections(sourceId, targetId) {
+    if (!canEdit) return;
     const nextCollections = reorderWithin(collections, sourceId, targetId);
     setCollections(nextCollections);
     await mutateBoard(
@@ -473,6 +578,7 @@ export default function BookmarkStartPageTool({ currentUser }) {
   }
 
   async function moveCollection(collectionId, offset) {
+    if (!canEdit) return;
     const nextCollections = moveByOffset(collections, collectionId, offset);
     setCollections(nextCollections);
     await mutateBoard(
@@ -482,6 +588,7 @@ export default function BookmarkStartPageTool({ currentUser }) {
   }
 
   async function reorderBookmark(sourceBookmark, targetCollectionId, targetBookmarkId = "") {
+    if (!canEdit) return;
     if (sourceBookmark.id === targetBookmarkId) return;
 
     const remainingBookmarks = bookmarks.filter((bookmark) => bookmark.id !== sourceBookmark.id);
@@ -521,6 +628,7 @@ export default function BookmarkStartPageTool({ currentUser }) {
 
   async function importPastedUrls(event) {
     event.preventDefault();
+    if (!canEdit) return;
     try {
       const targetCollectionId = bookmarkForm.collectionId || collections[0]?.id;
       const currentCount = bookmarks.filter((bookmark) => bookmark.collectionId === targetCollectionId).length;
@@ -549,6 +657,7 @@ export default function BookmarkStartPageTool({ currentUser }) {
 
   async function importJson(event) {
     event.preventDefault();
+    if (!canEdit) return;
     try {
       const imported = parseBookmarkBoardExport(importText);
       const collectionIdMap = new Map();
@@ -596,7 +705,6 @@ export default function BookmarkStartPageTool({ currentUser }) {
   }
 
   if (dbError) return <Alert variant="destructive">{dbError}</Alert>;
-  if (loading) return <section className="rounded-lg border border-border bg-card p-5 text-sm text-muted-foreground">Loading bookmarks...</section>;
 
   return (
     <div className="min-h-full overflow-hidden text-foreground">
@@ -609,24 +717,24 @@ export default function BookmarkStartPageTool({ currentUser }) {
           />
 
           <div className="mt-6 flex flex-wrap justify-end gap-2">
-            <Button type="button" onClick={() => openBookmarkDialog()}>
-              <Icons.Plus size={16} />
+            <Button type="button" onClick={() => openBookmarkDialog()} disabled={!canEdit}>
+              <Plus size={16} />
               Bookmark
             </Button>
-            <Button type="button" variant="secondary" onClick={() => openCollectionDialog()}>
-              <Icons.FolderPlus size={16} />
+            <Button type="button" variant="secondary" onClick={() => openCollectionDialog()} disabled={!canEdit}>
+              <FolderPlus size={16} />
               Collection
             </Button>
-            <Button type="button" variant="outline" onClick={openPasteImportDialog}>
-              <Icons.ClipboardPaste size={16} />
+            <Button type="button" variant="outline" onClick={openPasteImportDialog} disabled={!canEdit}>
+              <ClipboardPaste size={16} />
               Paste
             </Button>
-            <Button type="button" variant="outline" onClick={openJsonImportDialog}>
-              <Icons.Upload size={16} />
+            <Button type="button" variant="outline" onClick={openJsonImportDialog} disabled={!canEdit}>
+              <Upload size={16} />
               Import
             </Button>
             <Button type="button" variant="outline" onClick={exportBoard}>
-              <Icons.Download size={16} />
+              <Download size={16} />
               Export
             </Button>
             <Badge variant={syncState === "error" ? "destructive" : syncState === "idle" ? "secondary" : "success"}>
@@ -634,19 +742,23 @@ export default function BookmarkStartPageTool({ currentUser }) {
             </Badge>
           </div>
 
-          {!hasBoardData ? (
+          {loading ? (
+            <section className="mt-12 rounded-lg border border-border bg-card p-5 text-sm text-muted-foreground">
+              Loading bookmarks...
+            </section>
+          ) : !hasBoardData ? (
             <section className="mt-16 max-w-xl rounded-xl border border-[#25262b] bg-[#191a1d] p-6">
               <p className="text-xl font-bold text-[#f4f4f5]">No collections yet</p>
               <p className="mt-2 text-sm leading-6 text-[#999ba3]">
                 Create a collection or paste URLs to start your browser board.
               </p>
               <div className="mt-5 flex flex-wrap gap-2">
-                <Button type="button" onClick={() => openCollectionDialog()}>
-                  <Icons.FolderPlus size={16} />
+                <Button type="button" onClick={() => openCollectionDialog()} disabled={!canEdit}>
+                  <FolderPlus size={16} />
                   Collection
                 </Button>
-                <Button type="button" variant="secondary" onClick={openPasteImportDialog}>
-                  <Icons.ClipboardPaste size={16} />
+                <Button type="button" variant="secondary" onClick={openPasteImportDialog} disabled={!canEdit}>
+                  <ClipboardPaste size={16} />
                   Paste URLs
                 </Button>
               </div>
@@ -663,7 +775,7 @@ export default function BookmarkStartPageTool({ currentUser }) {
                 "group/collection flex min-h-[412px] flex-col rounded-lg border border-border bg-card px-0 py-6 text-card-foreground shadow-sm",
                 draggedCollectionId === collection.id && "opacity-40",
               )}
-              draggable
+              draggable={canEdit}
               onDragStart={(event) => {
                 event.dataTransfer.effectAllowed = "move";
                 setDraggedCollectionId(collection.id);
@@ -698,17 +810,17 @@ export default function BookmarkStartPageTool({ currentUser }) {
                   ) : null}
                 </div>
                 <div className="flex shrink-0 gap-1 opacity-100 transition-opacity lg:opacity-0 lg:group-hover/collection:opacity-100">
-                  <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-[#777985] hover:text-white" onClick={() => moveCollection(collection.id, -1)} disabled={collectionIndex === 0} aria-label="Move collection left">
-                    <Icons.ArrowLeft size={16} />
+                  <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-[#777985] hover:text-white" onClick={() => moveCollection(collection.id, -1)} disabled={!canEdit || collectionIndex === 0} aria-label="Move collection left">
+                    <ArrowLeft size={16} />
                   </Button>
-                  <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-[#777985] hover:text-white" onClick={() => moveCollection(collection.id, 1)} disabled={collectionIndex === collections.length - 1} aria-label="Move collection right">
-                    <Icons.ArrowRight size={16} />
+                  <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-[#777985] hover:text-white" onClick={() => moveCollection(collection.id, 1)} disabled={!canEdit || collectionIndex === collections.length - 1} aria-label="Move collection right">
+                    <ArrowRight size={16} />
                   </Button>
-                  <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-[#777985] hover:text-white" onClick={() => openCollectionDialog(collection)} aria-label="Edit collection">
-                    <Icons.Edit3 size={16} />
+                  <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-[#777985] hover:text-white" onClick={() => openCollectionDialog(collection)} disabled={!canEdit} aria-label="Edit collection">
+                    <Edit3 size={16} />
                   </Button>
-                  <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-[#777985] hover:text-red-300" onClick={() => deleteCollection(collection)} aria-label="Delete collection">
-                    <Icons.Trash2 size={16} />
+                  <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-[#777985] hover:text-red-300" onClick={() => deleteCollection(collection)} disabled={!canEdit} aria-label="Delete collection">
+                    <Trash2 size={16} />
                   </Button>
                 </div>
               </div>
@@ -744,7 +856,7 @@ export default function BookmarkStartPageTool({ currentUser }) {
                           draggedBookmark?.id !== bookmark.id &&
                           "bg-[#8b5cf6]/10 shadow-[inset_0_2px_0_#8b5cf6]",
                       )}
-                      draggable
+                      draggable={canEdit}
                       onContextMenu={(event) => openBookmarkContextMenu(event, bookmark)}
                       onDragStart={(event) => {
                         event.stopPropagation();
@@ -845,24 +957,27 @@ export default function BookmarkStartPageTool({ currentUser }) {
           </button>
           <button
             type="button"
-            className="block w-full px-3 py-2 text-left hover:bg-[#282930]"
+            className="block w-full px-3 py-2 text-left hover:bg-[#282930] disabled:cursor-not-allowed disabled:opacity-40"
             onClick={() => runBookmarkMenuAction(() => toggleFavorite(bookmarkMenu.bookmark))}
+            disabled={!canEdit}
             role="menuitem"
           >
             {bookmarkMenu.bookmark.isFavorite ? "Remove favorite" : "Add favorite"}
           </button>
           <button
             type="button"
-            className="block w-full px-3 py-2 text-left hover:bg-[#282930]"
+            className="block w-full px-3 py-2 text-left hover:bg-[#282930] disabled:cursor-not-allowed disabled:opacity-40"
             onClick={() => runBookmarkMenuAction(() => openBookmarkDialog(bookmarkMenu.bookmark))}
+            disabled={!canEdit}
             role="menuitem"
           >
             Edit
           </button>
           <button
             type="button"
-            className="block w-full px-3 py-2 text-left text-red-300 hover:bg-red-400/10"
+            className="block w-full px-3 py-2 text-left text-red-300 hover:bg-red-400/10 disabled:cursor-not-allowed disabled:opacity-40"
             onClick={() => runBookmarkMenuAction(() => deleteBookmark(bookmarkMenu.bookmark))}
+            disabled={!canEdit}
             role="menuitem"
           >
             Delete
@@ -900,7 +1015,7 @@ export default function BookmarkStartPageTool({ currentUser }) {
                 ))}
               </div>
             </div>
-            <Button type="submit" className="w-full">
+            <Button type="submit" className="w-full" disabled={!canEdit}>
               Save collection
             </Button>
           </form>
@@ -961,7 +1076,7 @@ export default function BookmarkStartPageTool({ currentUser }) {
               <Label htmlFor="bookmark-description">Description</Label>
               <Textarea id="bookmark-description" value={bookmarkForm.description} onChange={(event) => setBookmarkForm({ ...bookmarkForm, description: event.target.value })} />
             </div>
-            <Button type="submit" className="w-full">
+            <Button type="submit" className="w-full" disabled={!canEdit}>
               Save bookmark
             </Button>
           </form>
@@ -1001,7 +1116,7 @@ export default function BookmarkStartPageTool({ currentUser }) {
                 onChange={(event) => setImportText(event.target.value)}
               />
             </div>
-            <Button type="submit" className="w-full">
+            <Button type="submit" className="w-full" disabled={!canEdit}>
               {importDialog.mode === "json" ? "Import JSON" : "Import URLs"}
             </Button>
           </form>

@@ -196,6 +196,19 @@ export async function backfillBookmarkFavicons(supabase, userId, bookmarks) {
   await upsertBookmarks(supabase, userId, bookmarks);
 }
 
+export function createBookmarkBoardPayload(board, user) {
+  return {
+    version: board.version,
+    userId: board.userId,
+    user: {
+      id: user.id,
+      email: user.email ?? null,
+    },
+    collections: board.collections,
+    bookmarks: board.bookmarks,
+  };
+}
+
 export async function executeBookmarkBoardAction(supabase, userId, rawAction) {
   const action = parseBookmarkBoardAction(rawAction);
 

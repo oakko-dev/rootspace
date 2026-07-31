@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   BookmarkBoardError,
+  createBookmarkBoardPayload,
   executeBookmarkBoardAction,
   loadBookmarkBoard,
   parseBookmarkBoardAction,
@@ -110,6 +111,17 @@ test("binds authenticated board requests to the resolved server user", async () 
 
   assert.equal(context.user, user);
   assert.equal(context.supabase, supabase);
+});
+
+test("returns verified user details with a bookmark board", () => {
+  const payload = createBookmarkBoardPayload(
+    { version: 1, userId: "user-1", collections: [collection], bookmarks: [bookmark] },
+    { id: "user-1", email: "user@example.com" },
+  );
+
+  assert.deepEqual(payload.user, { id: "user-1", email: "user@example.com" });
+  assert.equal(payload.userId, "user-1");
+  assert.equal(payload.bookmarks[0].id, "openai");
 });
 
 test("loads collections and bookmarks in parallel-shaped queries", async () => {

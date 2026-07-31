@@ -1,6 +1,5 @@
 import "./globals.css";
 import AppShell from "@/components/app-shell";
-import { getCurrentUser } from "@/lib/supabase/server";
 
 export const metadata = {
   title: "Rootspace",
@@ -11,13 +10,11 @@ export const metadata = {
   },
 };
 
-export default async function RootLayout({ children }) {
-  const currentUser = await getCurrentUser();
-
+export default function RootLayout({ children }) {
   return (
     <html lang="en" className="h-full antialiased">
       <body className="min-h-full">
-        <AppShell currentUser={currentUser}>{children}</AppShell>
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   );

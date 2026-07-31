@@ -2,24 +2,72 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { signOut } from "@/app/auth/actions";
 import { toolCatalog } from "@/lib/tool-catalog";
-import * as Icons from "lucide-react";
+import {
+  Calendar,
+  FileJson,
+  HelpCircle,
+  LogIn,
+  LogOut,
+  PanelsTopLeft,
+  User,
+  Wallet,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { clearBookmarkBoardCache } from "@/lib/bookmark-board-cache";
+import {
+  BOOKMARK_BOARD_USER_EVENT,
+  BOOKMARK_BOARD_USER_KEY,
+  clearBookmarkBoardUser,
+  parseBookmarkBoardUser,
+  readBookmarkBoardUser,
+} from "@/lib/bookmark-board-user";
 import { cn } from "@/lib/utils";
 
-export default function AppShell({ children, currentUser }) {
+const TOOL_ICONS = { Calendar, FileJson, PanelsTopLeft, User, Wallet };
+
+export default function AppShell({ children }) {
   const pathname = usePathname();
+  const [currentUser, setCurrentUser] = useState(null);
   const isBookmarkPage = pathname === "/" || pathname === "/start-page";
-  const liveTools = toolCatalog.filter((tool) => {
-    if (tool.status !== "Ready") return false;
-    if (tool.authRequired && !currentUser) return false;
-    return true;
-  });
+  const liveTools = toolCatalog.filter((tool) => tool.status === "Ready");
   const navItems = liveTools;
+
+  useEffect(() => {
+    const cachedUser = readBookmarkBoardUser();
+    const frame = cachedUser
+      ? window.requestAnimationFrame(() => {
+          setCurrentUser({ id: cachedUser.userId, cached: true });
+        })
+      : 0;
+
+    function syncUserFromStorage(event) {
+      if (event.key !== BOOKMARK_BOARD_USER_KEY) return;
+      const nextUser = event.newValue ? parseBookmarkBoardUser(event.newValue) : null;
+      setCurrentUser(nextUser ? { id: nextUser.userId, cached: true } : null);
+    }
+
+    function syncVerifiedUser(event) {
+      setCurrentUser(event.detail || null);
+    }
+
+    window.addEventListener("storage", syncUserFromStorage);
+    window.addEventListener(BOOKMARK_BOARD_USER_EVENT, syncVerifiedUser);
+    return () => {
+      if (frame) window.cancelAnimationFrame(frame);
+      window.removeEventListener("storage", syncUserFromStorage);
+      window.removeEventListener(BOOKMARK_BOARD_USER_EVENT, syncVerifiedUser);
+    };
+  }, []);
+
+  function clearDeviceUser() {
+    if (currentUser?.id) clearBookmarkBoardCache(currentUser.id);
+    clearBookmarkBoardUser();
+  }
 
   return (
     <main
@@ -63,7 +111,7 @@ export default function AppShell({ children, currentUser }) {
             <div className="space-y-1">
               {navItems.map((item) => {
                 const active = pathname === item.href;
-                const Icon = Icons[item.icon] || Icons.HelpCircle;
+                const Icon = TOOL_ICONS[item.icon] || HelpCircle;
 
                 return (
                   <Link
@@ -96,16 +144,20 @@ export default function AppShell({ children, currentUser }) {
               </div>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold text-foreground">
-                  {currentUser?.email ?? "Guest"}
+                  {currentUser?.email ?? (currentUser ? "Cached session" : "Guest")}
                 </p>
                 <p className="truncate text-xs text-muted-foreground">
-                  {currentUser ? "supabase session" : "not authenticated"}
+                  {currentUser?.email
+                    ? "supabase session"
+                    : currentUser
+                      ? "verifying session"
+                      : "not authenticated"}
                 </p>
               </div>
               {currentUser ? (
                 <form
                   action={signOut}
-                  onSubmit={() => clearBookmarkBoardCache(currentUser.id)}
+                  onSubmit={clearDeviceUser}
                 >
                   <Button
                     variant="ghost"
@@ -113,7 +165,7 @@ export default function AppShell({ children, currentUser }) {
                     className="font-mono text-xs text-muted-foreground"
                     type="submit"
                   >
-                    <Icons.LogOut size={14} />
+                    <LogOut size={14} />
                     <span>out</span>
                   </Button>
                 </form>
@@ -122,7 +174,7 @@ export default function AppShell({ children, currentUser }) {
                   className="inline-flex h-9 items-center gap-1 rounded-md px-3 font-mono text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
                   href="/login"
                 >
-                  <Icons.LogIn size={14} />
+                  <LogIn size={14} />
                   <span>in</span>
                 </Link>
               )}
