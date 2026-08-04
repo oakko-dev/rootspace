@@ -2,18 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  ArrowLeft,
-  ArrowRight,
-  ClipboardPaste,
-  Download,
-  Edit3,
-  FolderPlus,
-  Globe2,
-  Plus,
-  Trash2,
-  Upload,
-} from "lucide-react";
+import { Globe2 } from "lucide-react";
 import {
   exportBookmarkBoard,
   filterBookmarkBoard,
@@ -156,7 +145,14 @@ export default function BookmarkStartPageTool() {
   const [draggedBookmark, setDraggedBookmark] = useState(null);
   const [collectionDropPreviewId, setCollectionDropPreviewId] = useState("");
   const [bookmarkDropPreview, setBookmarkDropPreview] = useState({ collectionId: "", bookmarkId: "" });
-  const [bookmarkMenu, setBookmarkMenu] = useState({ open: false, x: 0, y: 0, bookmark: null });
+  const [contextMenu, setContextMenu] = useState({
+    open: false,
+    x: 0,
+    y: 0,
+    type: "board",
+    collection: null,
+    bookmark: null,
+  });
 
   const board = useMemo(
     () => filterBookmarkBoard(collections, bookmarks, ""),
@@ -319,26 +315,26 @@ export default function BookmarkStartPageTool() {
   }, [user?.id]);
 
   useEffect(() => {
-    if (!bookmarkMenu.open) return undefined;
+    if (!contextMenu.open) return undefined;
 
-    function closeBookmarkMenu() {
-      setBookmarkMenu({ open: false, x: 0, y: 0, bookmark: null });
+    function closeContextMenu() {
+      setContextMenu((current) => ({ ...current, open: false }));
     }
 
-    function closeBookmarkMenuOnEscape(event) {
-      if (event.key === "Escape") closeBookmarkMenu();
+    function closeContextMenuOnEscape(event) {
+      if (event.key === "Escape") closeContextMenu();
     }
 
-    window.addEventListener("click", closeBookmarkMenu);
-    window.addEventListener("scroll", closeBookmarkMenu, true);
-    window.addEventListener("keydown", closeBookmarkMenuOnEscape);
+    window.addEventListener("click", closeContextMenu);
+    window.addEventListener("scroll", closeContextMenu, true);
+    window.addEventListener("keydown", closeContextMenuOnEscape);
 
     return () => {
-      window.removeEventListener("click", closeBookmarkMenu);
-      window.removeEventListener("scroll", closeBookmarkMenu, true);
-      window.removeEventListener("keydown", closeBookmarkMenuOnEscape);
+      window.removeEventListener("click", closeContextMenu);
+      window.removeEventListener("scroll", closeContextMenu, true);
+      window.removeEventListener("keydown", closeContextMenuOnEscape);
     };
-  }, [bookmarkMenu.open]);
+  }, [contextMenu.open]);
 
   function openCollectionDialog(collection = null) {
     if (!canEdit) return;
@@ -409,10 +405,14 @@ export default function BookmarkStartPageTool() {
     }
   }
 
-  function openPasteImportDialog() {
+  function openPasteImportDialog(collectionId = "") {
     if (!canEdit) return;
     setFormError("");
     setImportText("");
+    setBookmarkForm((current) => ({
+      ...current,
+      collectionId: collectionId || current.collectionId || collections[0]?.id || "",
+    }));
     setImportDialog({ open: true, mode: "paste" });
   }
 
@@ -429,19 +429,21 @@ export default function BookmarkStartPageTool() {
     setImportDialog({ open: false, mode: "paste" });
   }
 
-  function openBookmarkContextMenu(event, bookmark) {
+  function openContextMenu(event, type, { collection = null, bookmark = null } = {}) {
     event.preventDefault();
     event.stopPropagation();
-    setBookmarkMenu({
+    setContextMenu({
       open: true,
       x: event.clientX,
       y: event.clientY,
+      type,
+      collection,
       bookmark,
     });
   }
 
-  function runBookmarkMenuAction(callback) {
-    setBookmarkMenu({ open: false, x: 0, y: 0, bookmark: null });
+  function runContextMenuAction(callback) {
+    setContextMenu((current) => ({ ...current, open: false }));
     callback();
   }
 
@@ -709,34 +711,20 @@ export default function BookmarkStartPageTool() {
   return (
     <div className="min-h-full overflow-hidden text-foreground">
       <div className="min-h-full">
-        <section className="min-w-0 px-4 py-6 sm:px-8 lg:px-12">
+        <section
+          className="min-w-0 px-4 py-6 sm:px-8 lg:px-12"
+          onContextMenu={(event) => openContextMenu(event, "board")}
+        >
           <PageHeader
             eyebrow="rootspace / bookmarks"
             title="Bookmark start page"
             description="Organize synced collections and links for your browser start page."
           />
 
-          <div className="mt-6 flex flex-wrap justify-end gap-2">
-            <Button type="button" onClick={() => openBookmarkDialog()} disabled={!canEdit}>
-              <Plus size={16} />
-              Bookmark
-            </Button>
-            <Button type="button" variant="secondary" onClick={() => openCollectionDialog()} disabled={!canEdit}>
-              <FolderPlus size={16} />
-              Collection
-            </Button>
-            <Button type="button" variant="outline" onClick={openPasteImportDialog} disabled={!canEdit}>
-              <ClipboardPaste size={16} />
-              Paste
-            </Button>
-            <Button type="button" variant="outline" onClick={openJsonImportDialog} disabled={!canEdit}>
-              <Upload size={16} />
-              Import
-            </Button>
-            <Button type="button" variant="outline" onClick={exportBoard}>
-              <Download size={16} />
-              Export
-            </Button>
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-xs text-muted-foreground">
+              Right-click the page, a collection, or a bookmark for commands.
+            </p>
             <Badge variant={syncState === "error" ? "destructive" : syncState === "idle" ? "secondary" : "success"}>
               {syncState}
             </Badge>
@@ -750,34 +738,27 @@ export default function BookmarkStartPageTool() {
             <section className="mt-16 max-w-xl rounded-xl border border-[#25262b] bg-[#191a1d] p-6">
               <p className="text-xl font-bold text-[#f4f4f5]">No collections yet</p>
               <p className="mt-2 text-sm leading-6 text-[#999ba3]">
-                Create a collection or paste URLs to start your browser board.
+                Right-click here to create a collection or import a board.
               </p>
-              <div className="mt-5 flex flex-wrap gap-2">
-                <Button type="button" onClick={() => openCollectionDialog()} disabled={!canEdit}>
-                  <FolderPlus size={16} />
-                  Collection
-                </Button>
-                <Button type="button" variant="secondary" onClick={openPasteImportDialog} disabled={!canEdit}>
-                  <ClipboardPaste size={16} />
-                  Paste URLs
-                </Button>
-              </div>
             </section>
           ) : (
-            <section className="mt-12 grid min-h-[420px] grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-              {board.map((collection, collectionIndex) => (
-                <div key={collection.id} className="contents">
-                  {collectionDropPreviewId === collection.id && draggedCollectionId !== collection.id ? (
-                    <div className="min-h-[412px] rounded-lg border border-dashed border-[#8b5cf6] bg-[#8b5cf6]/10" />
-                  ) : null}
+            <section className="mt-12 columns-1 gap-4 md:columns-2 xl:columns-4">
+              {board.map((collection) => (
+                <div key={collection.id} className="mb-4 break-inside-avoid">
                   <div
               className={cn(
-                "group/collection flex min-h-[412px] flex-col rounded-lg border border-border bg-card px-0 py-6 text-card-foreground shadow-sm",
+                "flex h-fit flex-col rounded-lg border border-border bg-card px-0 py-6 text-card-foreground shadow-sm",
                 draggedCollectionId === collection.id && "opacity-40",
+                collectionDropPreviewId === collection.id &&
+                  draggedCollectionId &&
+                  draggedCollectionId !== collection.id &&
+                  "border-[#8b5cf6] bg-[#8b5cf6]/10 ring-2 ring-[#8b5cf6]/60",
               )}
               draggable={canEdit}
+              onContextMenu={(event) => openContextMenu(event, "collection", { collection })}
               onDragStart={(event) => {
                 event.dataTransfer.effectAllowed = "move";
+                event.dataTransfer.setData("text/plain", collection.id);
                 setDraggedCollectionId(collection.id);
                 setCollectionDropPreviewId(collection.id);
               }}
@@ -794,12 +775,15 @@ export default function BookmarkStartPageTool() {
                   setCollectionDropPreviewId(collection.id);
                 }
               }}
-              onDrop={() => {
-                if (draggedCollectionId && !draggedBookmark) reorderCollections(draggedCollectionId, collection.id);
+              onDrop={(event) => {
+                if (!draggedCollectionId || draggedBookmark) return;
+                event.preventDefault();
+                event.stopPropagation();
+                reorderCollections(draggedCollectionId, collection.id);
                 clearDragState();
               }}
             >
-              <div className="flex items-start justify-between gap-3 px-7">
+              <div className="flex items-start gap-3 px-7">
                 <div className="min-w-0">
                   <div className="flex items-center gap-3">
                     <span className="h-2.5 w-2.5 rounded-full opacity-90" style={{ backgroundColor: collection.color }} />
@@ -809,24 +793,10 @@ export default function BookmarkStartPageTool() {
                     <p className="mt-2 line-clamp-2 text-xs leading-5 text-[#777985]">{collection.description}</p>
                   ) : null}
                 </div>
-                <div className="flex shrink-0 gap-1 opacity-100 transition-opacity lg:opacity-0 lg:group-hover/collection:opacity-100">
-                  <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-[#777985] hover:text-white" onClick={() => moveCollection(collection.id, -1)} disabled={!canEdit || collectionIndex === 0} aria-label="Move collection left">
-                    <ArrowLeft size={16} />
-                  </Button>
-                  <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-[#777985] hover:text-white" onClick={() => moveCollection(collection.id, 1)} disabled={!canEdit || collectionIndex === collections.length - 1} aria-label="Move collection right">
-                    <ArrowRight size={16} />
-                  </Button>
-                  <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-[#777985] hover:text-white" onClick={() => openCollectionDialog(collection)} disabled={!canEdit} aria-label="Edit collection">
-                    <Edit3 size={16} />
-                  </Button>
-                  <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-[#777985] hover:text-red-300" onClick={() => deleteCollection(collection)} disabled={!canEdit} aria-label="Delete collection">
-                    <Trash2 size={16} />
-                  </Button>
-                </div>
               </div>
 
               <div
-                className="mt-7 flex flex-1 flex-col gap-2 px-7"
+                className="mt-7 flex flex-col gap-2 px-7"
                 onDragEnter={() => {
                   if (draggedBookmark) {
                     setBookmarkDropPreview({ collectionId: collection.id, bookmarkId: "" });
@@ -839,8 +809,10 @@ export default function BookmarkStartPageTool() {
                     setBookmarkDropPreview({ collectionId: collection.id, bookmarkId: "" });
                   }
                 }}
-                onDrop={() => {
-                  if (draggedBookmark) reorderBookmark(draggedBookmark, collection.id);
+                onDrop={(event) => {
+                  if (!draggedBookmark) return;
+                  event.stopPropagation();
+                  reorderBookmark(draggedBookmark, collection.id);
                   clearDragState();
                 }}
               >
@@ -857,7 +829,7 @@ export default function BookmarkStartPageTool() {
                           "bg-[#8b5cf6]/10 shadow-[inset_0_2px_0_#8b5cf6]",
                       )}
                       draggable={canEdit}
-                      onContextMenu={(event) => openBookmarkContextMenu(event, bookmark)}
+                      onContextMenu={(event) => openContextMenu(event, "bookmark", { collection, bookmark })}
                       onDragStart={(event) => {
                         event.stopPropagation();
                         event.dataTransfer.effectAllowed = "move";
@@ -867,8 +839,8 @@ export default function BookmarkStartPageTool() {
                         setBookmarkDropPreview({ collectionId: collection.id, bookmarkId: bookmark.id });
                       }}
                       onDragEnter={(event) => {
-                        event.stopPropagation();
                         if (draggedBookmark) {
+                          event.stopPropagation();
                           setBookmarkDropPreview({ collectionId: collection.id, bookmarkId: bookmark.id });
                         }
                       }}
@@ -882,8 +854,9 @@ export default function BookmarkStartPageTool() {
                       }}
                       onDragEnd={clearDragState}
                       onDrop={(event) => {
+                        if (!draggedBookmark) return;
                         event.stopPropagation();
-                        if (draggedBookmark) reorderBookmark(draggedBookmark, collection.id, bookmark.id);
+                        reorderBookmark(draggedBookmark, collection.id, bookmark.id);
                         clearDragState();
                       }}
                     >
@@ -923,65 +896,180 @@ export default function BookmarkStartPageTool() {
         </section>
       </div>
 
-      {bookmarkMenu.open && bookmarkMenu.bookmark ? (
+      {contextMenu.open ? (
         <div
-          className="fixed z-[60] min-w-44 overflow-hidden rounded-lg border border-[#2a2b31] bg-[#1b1c20] py-1 text-sm text-[#e7e7ea] shadow-2xl shadow-black/40"
+          className="fixed z-[60] min-w-52 overflow-hidden rounded-lg border border-[#2a2b31] bg-[#1b1c20] py-1 text-sm text-[#e7e7ea] shadow-2xl shadow-black/40"
           style={{
             left:
               typeof window === "undefined"
-                ? bookmarkMenu.x
-                : Math.min(bookmarkMenu.x, window.innerWidth - 190),
+                ? contextMenu.x
+                : Math.max(8, Math.min(contextMenu.x, window.innerWidth - 220)),
             top:
               typeof window === "undefined"
-                ? bookmarkMenu.y
-                : Math.min(bookmarkMenu.y, window.innerHeight - 190),
+                ? contextMenu.y
+                : Math.max(8, Math.min(contextMenu.y, window.innerHeight - 330)),
           }}
           role="menu"
           onClick={(event) => event.stopPropagation()}
         >
-          <button
-            type="button"
-            className="block w-full px-3 py-2 text-left hover:bg-[#282930]"
-            onClick={() => runBookmarkMenuAction(() => window.open(bookmarkMenu.bookmark.url, "_blank", "noreferrer"))}
-            role="menuitem"
-          >
-            Open
-          </button>
-          <button
-            type="button"
-            className="block w-full px-3 py-2 text-left hover:bg-[#282930]"
-            onClick={() => runBookmarkMenuAction(() => navigator.clipboard.writeText(bookmarkMenu.bookmark.url))}
-            role="menuitem"
-          >
-            Copy URL
-          </button>
-          <button
-            type="button"
-            className="block w-full px-3 py-2 text-left hover:bg-[#282930] disabled:cursor-not-allowed disabled:opacity-40"
-            onClick={() => runBookmarkMenuAction(() => toggleFavorite(bookmarkMenu.bookmark))}
-            disabled={!canEdit}
-            role="menuitem"
-          >
-            {bookmarkMenu.bookmark.isFavorite ? "Remove favorite" : "Add favorite"}
-          </button>
-          <button
-            type="button"
-            className="block w-full px-3 py-2 text-left hover:bg-[#282930] disabled:cursor-not-allowed disabled:opacity-40"
-            onClick={() => runBookmarkMenuAction(() => openBookmarkDialog(bookmarkMenu.bookmark))}
-            disabled={!canEdit}
-            role="menuitem"
-          >
-            Edit
-          </button>
-          <button
-            type="button"
-            className="block w-full px-3 py-2 text-left text-red-300 hover:bg-red-400/10 disabled:cursor-not-allowed disabled:opacity-40"
-            onClick={() => runBookmarkMenuAction(() => deleteBookmark(bookmarkMenu.bookmark))}
-            disabled={!canEdit}
-            role="menuitem"
-          >
-            Delete
-          </button>
+          {contextMenu.type === "bookmark" && contextMenu.bookmark ? (
+            <>
+              <button
+                type="button"
+                className="block w-full px-3 py-2 text-left hover:bg-[#282930]"
+                onClick={() => runContextMenuAction(() => window.open(contextMenu.bookmark.url, "_blank", "noreferrer"))}
+                role="menuitem"
+              >
+                Open
+              </button>
+              <button
+                type="button"
+                className="block w-full px-3 py-2 text-left hover:bg-[#282930]"
+                onClick={() => runContextMenuAction(() => navigator.clipboard.writeText(contextMenu.bookmark.url))}
+                role="menuitem"
+              >
+                Copy URL
+              </button>
+              <button
+                type="button"
+                className="block w-full px-3 py-2 text-left hover:bg-[#282930] disabled:cursor-not-allowed disabled:opacity-40"
+                onClick={() => runContextMenuAction(() => toggleFavorite(contextMenu.bookmark))}
+                disabled={!canEdit}
+                role="menuitem"
+              >
+                {contextMenu.bookmark.isFavorite ? "Remove favorite" : "Add favorite"}
+              </button>
+              <button
+                type="button"
+                className="block w-full px-3 py-2 text-left hover:bg-[#282930] disabled:cursor-not-allowed disabled:opacity-40"
+                onClick={() => runContextMenuAction(() => openBookmarkDialog(contextMenu.bookmark))}
+                disabled={!canEdit}
+                role="menuitem"
+              >
+                Edit bookmark
+              </button>
+              <button
+                type="button"
+                className="block w-full px-3 py-2 text-left text-red-300 hover:bg-red-400/10 disabled:cursor-not-allowed disabled:opacity-40"
+                onClick={() => runContextMenuAction(() => deleteBookmark(contextMenu.bookmark))}
+                disabled={!canEdit}
+                role="menuitem"
+              >
+                Delete bookmark
+              </button>
+            </>
+          ) : null}
+
+          {contextMenu.type === "collection" && contextMenu.collection ? (
+            <>
+              <button
+                type="button"
+                className="block w-full px-3 py-2 text-left hover:bg-[#282930] disabled:cursor-not-allowed disabled:opacity-40"
+                onClick={() => runContextMenuAction(() => openBookmarkDialog(null, contextMenu.collection.id))}
+                disabled={!canEdit}
+                role="menuitem"
+              >
+                Add bookmark
+              </button>
+              <button
+                type="button"
+                className="block w-full px-3 py-2 text-left hover:bg-[#282930] disabled:cursor-not-allowed disabled:opacity-40"
+                onClick={() => runContextMenuAction(() => openPasteImportDialog(contextMenu.collection.id))}
+                disabled={!canEdit}
+                role="menuitem"
+              >
+                Paste URLs
+              </button>
+              <div className="my-1 border-t border-[#2a2b31]" role="separator" />
+              <button
+                type="button"
+                className="block w-full px-3 py-2 text-left hover:bg-[#282930] disabled:cursor-not-allowed disabled:opacity-40"
+                onClick={() => runContextMenuAction(() => openCollectionDialog(contextMenu.collection))}
+                disabled={!canEdit}
+                role="menuitem"
+              >
+                Edit collection
+              </button>
+              <button
+                type="button"
+                className="block w-full px-3 py-2 text-left hover:bg-[#282930] disabled:cursor-not-allowed disabled:opacity-40"
+                onClick={() => runContextMenuAction(() => moveCollection(contextMenu.collection.id, -1))}
+                disabled={!canEdit || collections.findIndex((item) => item.id === contextMenu.collection.id) === 0}
+                role="menuitem"
+              >
+                Move left
+              </button>
+              <button
+                type="button"
+                className="block w-full px-3 py-2 text-left hover:bg-[#282930] disabled:cursor-not-allowed disabled:opacity-40"
+                onClick={() => runContextMenuAction(() => moveCollection(contextMenu.collection.id, 1))}
+                disabled={!canEdit || collections.findIndex((item) => item.id === contextMenu.collection.id) === collections.length - 1}
+                role="menuitem"
+              >
+                Move right
+              </button>
+              <button
+                type="button"
+                className="block w-full px-3 py-2 text-left text-red-300 hover:bg-red-400/10 disabled:cursor-not-allowed disabled:opacity-40"
+                onClick={() => runContextMenuAction(() => deleteCollection(contextMenu.collection))}
+                disabled={!canEdit}
+                role="menuitem"
+              >
+                Delete collection
+              </button>
+            </>
+          ) : null}
+
+          {contextMenu.type === "board" ? (
+            <>
+              <button
+                type="button"
+                className="block w-full px-3 py-2 text-left hover:bg-[#282930] disabled:cursor-not-allowed disabled:opacity-40"
+                onClick={() => runContextMenuAction(() => openBookmarkDialog())}
+                disabled={!canEdit || collections.length === 0}
+                role="menuitem"
+              >
+                Add bookmark
+              </button>
+              <button
+                type="button"
+                className="block w-full px-3 py-2 text-left hover:bg-[#282930] disabled:cursor-not-allowed disabled:opacity-40"
+                onClick={() => runContextMenuAction(() => openCollectionDialog())}
+                disabled={!canEdit}
+                role="menuitem"
+              >
+                Add collection
+              </button>
+              <div className="my-1 border-t border-[#2a2b31]" role="separator" />
+              <button
+                type="button"
+                className="block w-full px-3 py-2 text-left hover:bg-[#282930] disabled:cursor-not-allowed disabled:opacity-40"
+                onClick={() => runContextMenuAction(() => openPasteImportDialog())}
+                disabled={!canEdit || collections.length === 0}
+                role="menuitem"
+              >
+                Paste URLs
+              </button>
+              <button
+                type="button"
+                className="block w-full px-3 py-2 text-left hover:bg-[#282930] disabled:cursor-not-allowed disabled:opacity-40"
+                onClick={() => runContextMenuAction(openJsonImportDialog)}
+                disabled={!canEdit}
+                role="menuitem"
+              >
+                Import board JSON
+              </button>
+              <button
+                type="button"
+                className="block w-full px-3 py-2 text-left hover:bg-[#282930] disabled:cursor-not-allowed disabled:opacity-40"
+                onClick={() => runContextMenuAction(exportBoard)}
+                disabled={!hasBoardData}
+                role="menuitem"
+              >
+                Export board JSON
+              </button>
+            </>
+          ) : null}
         </div>
       ) : null}
 
