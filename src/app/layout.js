@@ -1,5 +1,16 @@
+// The root layout owns shared typography so every route inherits one font contract.
+import { Google_Sans } from "next/font/google";
 import "./globals.css";
 import AppShell from "@/components/app-shell";
+
+const googleSans = Google_Sans({
+  variable: "--font-google-sans",
+  subsets: ["latin", "thai"],
+  weight: "variable",
+  style: "normal",
+  display: "swap",
+  fallback: ["Arial", "Helvetica", "sans-serif"],
+});
 
 export const metadata = {
   title: "Rootspace",
@@ -12,7 +23,7 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" className="h-full antialiased">
+    <html lang="en" className={`${googleSans.variable} h-full font-sans antialiased`}>
       <body className="min-h-full">
         <AppShell>{children}</AppShell>
       </body>

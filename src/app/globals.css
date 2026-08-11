@@ -1,3 +1,4 @@
+/* Global theme tokens keep interface and structured-data typography independent. */
 @import "tailwindcss";
 
 :root {
@@ -40,14 +41,13 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --font-sans: Arial, Helvetica, sans-serif;
+  --font-sans: var(--font-google-sans);
   --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
 }
 
 button,
