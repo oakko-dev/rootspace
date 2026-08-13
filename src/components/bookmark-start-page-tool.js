@@ -28,8 +28,15 @@ import {
   readBookmarkBoardUser,
   writeBookmarkBoardUser,
 } from "@/lib/bookmark-board-user";
+import {
+  BOOKMARK_OPENING_NEW_TAB,
+  getBookmarkLinkTarget,
+  readBookmarkOpeningPreference,
+  writeBookmarkOpeningPreference,
+} from "@/lib/bookmark-opening-preference";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import BookmarkOpeningSettings from "@/components/bookmark-opening-settings";
 import { Button } from "@/components/ui/button";
 import PageHeader from "@/components/page-header";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -126,6 +133,9 @@ export default function BookmarkStartPageTool() {
   const [loading, setLoading] = useState(true);
   const [dbError, setDbError] = useState(null);
   const [syncState, setSyncState] = useState("idle");
+  const [bookmarkOpeningPreference, setBookmarkOpeningPreference] = useState(
+    BOOKMARK_OPENING_NEW_TAB,
+  );
   const [collectionDialog, setCollectionDialog] = useState({ open: false, item: null });
   const [bookmarkDialog, setBookmarkDialog] = useState({ open: false, item: null, collectionId: "" });
   const [importDialog, setImportDialog] = useState({ open: false, mode: "paste" });
@@ -160,6 +170,19 @@ export default function BookmarkStartPageTool() {
   );
   const hasBoardData = collections.length > 0;
   const canEdit = Boolean(user?.id && verifiedUserId === user.id);
+
+  useEffect(() => {
+    const restorePreference = window.setTimeout(() => {
+      setBookmarkOpeningPreference(readBookmarkOpeningPreference());
+    }, 0);
+    return () => window.clearTimeout(restorePreference);
+  }, []);
+
+  // Updates navigation immediately while the storage utility handles persistence failures.
+  function changeBookmarkOpeningPreference(preference) {
+    const saved = writeBookmarkOpeningPreference(preference);
+    setBookmarkOpeningPreference(saved ? preference : BOOKMARK_OPENING_NEW_TAB);
+  }
 
   async function upsertCollections(nextCollections) {
     if (!canEdit || nextCollections.length === 0) return;
@@ -725,9 +748,15 @@ export default function BookmarkStartPageTool() {
             <p className="text-xs text-muted-foreground">
               Right-click the page, a collection, or a bookmark for commands.
             </p>
-            <Badge variant={syncState === "error" ? "destructive" : syncState === "idle" ? "secondary" : "success"}>
-              {syncState}
-            </Badge>
+            <div className="flex items-center gap-2">
+              <BookmarkOpeningSettings
+                preference={bookmarkOpeningPreference}
+                onPreferenceChange={changeBookmarkOpeningPreference}
+              />
+              <Badge variant={syncState === "error" ? "destructive" : syncState === "idle" ? "secondary" : "success"}>
+                {syncState}
+              </Badge>
+            </div>
           </div>
 
           {loading ? (
@@ -868,7 +897,7 @@ export default function BookmarkStartPageTool() {
                           />
                           <a
                             href={bookmark.url}
-                            target="_blank"
+                            target={getBookmarkLinkTarget(bookmarkOpeningPreference)}
                             rel="noreferrer"
                             draggable={false}
                             className="min-w-0 truncate text-sm font-bold text-[#dedee3] hover:text-white"
@@ -920,7 +949,7 @@ export default function BookmarkStartPageTool() {
                 onClick={() => runContextMenuAction(() => window.open(contextMenu.bookmark.url, "_blank", "noreferrer"))}
                 role="menuitem"
               >
-                Open
+                Open in new tab
               </button>
               <button
                 type="button"
