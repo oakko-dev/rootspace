@@ -1,11 +1,11 @@
-import ThaiNameGeneratorTool from "@/components/thai-name-generator-tool";
 import PageHeader from "@/components/page-header";
+import ThaiNameGeneratorTool from "@/components/thai-name-generator-tool";
 
 export default function ThaiNameGeneratorPage() {
-  return (
-    <>
-      <PageHeader eyebrow="rootspace / tool 02" title="Thai name generator" />
-      <ThaiNameGeneratorTool />
-    </>
-  );
+	return (
+		<>
+			<PageHeader eyebrow="rootspace / tool 02" title="Thai name generator" />
+			<ThaiNameGeneratorTool />
+		</>
+	);
 }
