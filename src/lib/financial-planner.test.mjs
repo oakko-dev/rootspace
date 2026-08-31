@@ -57,6 +57,21 @@ test("does not show an installment in the same month of an inactive year", () =>
 	assert.equal(card.expected, 0);
 });
 
+test("uses one card-level payment status for all installments", () => {
+	const [card] = calculateDashboardTotals(
+		[{ id: "card-1", name: "Firstchoice" }],
+		[
+			{ id: "loan-1", cardId: "card-1", monthly: 100, startMonth: 0, endMonth: 0 },
+			{ id: "loan-2", cardId: "card-1", monthly: 50, startMonth: 0, endMonth: 0 },
+		],
+		0,
+		new Map([["card-1", true]]),
+	);
+	assert.equal(card.items.length, 2);
+	assert.equal(card.paid, 150);
+	assert.equal(card.cardPaid, true);
+});
+
 test("calculates annual cash flow from income, deductions, expenses, and installments", () => {
 	const totals = calculateAnnualTotals({
 		income: [{ monthly: 100, plan: [100, 200] }],

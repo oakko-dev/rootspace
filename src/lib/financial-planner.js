@@ -161,7 +161,7 @@ export function getDashboardMonth(installment, monthIndex) {
 	};
 }
 
-export function calculateDashboardTotals(cards, installments, monthIndex) {
+export function calculateDashboardTotals(cards, installments, monthIndex, paidCards = new Map()) {
 	return cards.map((card) => {
 		const items = (installments || [])
 			.filter(
@@ -173,9 +173,11 @@ export function calculateDashboardTotals(cards, installments, monthIndex) {
 			...card,
 			items,
 			expected: items.reduce((sum, item) => sum + item.month.amount, 0),
-			paid: items
-				.filter((item) => item.month.paid)
-				.reduce((sum, item) => sum + item.month.amount, 0),
+			cardPaid: paidCards.get(card.id) === true,
+			paid:
+				paidCards.get(card.id) === true
+					? items.reduce((sum, item) => sum + item.month.amount, 0)
+					: 0,
 		};
 	});
 }

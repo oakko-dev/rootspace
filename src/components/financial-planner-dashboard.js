@@ -1,24 +1,24 @@
 "use client";
 
-import { Check, ChevronLeft, ChevronRight, Circle, Eye, EyeOff, LoaderCircle } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Eye, EyeOff, LoaderCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import {
 	calculateDashboardTotals,
 	installmentMonthBounds,
 	installmentIsComplete,
 	PLANNER_MONTHS,
 } from "@/lib/financial-planner";
-import { formatMoneyInput, parseMoneyInput } from "@/lib/money-input";
+import { formatMoneyInput } from "@/lib/money-input";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 const MONTH_TABLE = "financial_planner_installment_months";
 const YEAR_TABLE = "financial_planner_installments";
 const CARD_TABLE = "financial_planner_cards";
+const CARD_MONTH_TABLE = "financial_planner_card_months";
 
 function amount(value) {
 	return `฿${formatMoneyInput(value)}`;
@@ -32,6 +32,7 @@ export default function FinancialPlannerDashboard() {
 	const [year, setYear] = useState(new Date().getFullYear());
 	const [cards, setCards] = useState([]);
 	const [installments, setInstallments] = useState([]);
+	const [paidCards, setPaidCards] = useState(new Map());
 	const [showCompleted, setShowCompleted] = useState(false);
 	const [loading, setLoading] = useState(true);
 	const [saving, setSaving] = useState(null);
@@ -45,10 +46,15 @@ export default function FinancialPlannerDashboard() {
 				if (auth.error || !auth.data.user) {
 					throw new Error("You must be logged in to view the dashboard.");
 				}
-				const [cardResult, installmentResult, monthResult] = await Promise.all([
+				const [cardResult, installmentResult, monthResult, cardMonthResult] = await Promise.all([
 					supabase.from(CARD_TABLE).select("*").eq("user_id", auth.data.user.id).order("name"),
 					supabase.from(YEAR_TABLE).select("*").eq("user_id", auth.data.user.id),
 					supabase.from(MONTH_TABLE).select("*").eq("user_id", auth.data.user.id),
+					supabase
+						.from(CARD_MONTH_TABLE)
+						.select("card_id, planner_year, planner_month, paid")
+						.eq("user_id", auth.data.user.id)
+						.eq("planner_year", year),
 				]);
 				if (cardResult.error) {
 					throw cardResult.error;
@@ -59,6 +65,9 @@ export default function FinancialPlannerDashboard() {
 				if (monthResult.error && !["PGRST205", "42P01"].includes(monthResult.error.code)) {
 					throw monthResult.error;
 				}
+				if (cardMonthResult.error && !["PGRST205", "42P01"].includes(cardMonthResult.error.code)) {
+					throw cardMonthResult.error;
+				}
 				const monthly = new Map(
 					(monthResult.data || []).map((row) => [
 						`${row.installment_id}:${row.planner_year}:${row.planner_month}`,
@@ -66,6 +75,12 @@ export default function FinancialPlannerDashboard() {
 					]),
 				);
 				const paidByInstallment = new Map();
+				const nextPaidCards = new Map();
+				for (const row of cardMonthResult.data || []) {
+					if (row.planner_month === new Date(year, month).getMonth() + 1) {
+						nextPaidCards.set(row.card_id, row.paid);
+					}
+				}
 				for (const row of monthResult.data || []) {
 					const paid = paidByInstallment.get(row.installment_id) || new Map();
 					paid.set(`${row.planner_year}-${String(row.planner_month).padStart(2, "0")}`, row.paid);
@@ -92,6 +107,7 @@ export default function FinancialPlannerDashboard() {
 					setUser(auth.data.user);
 					setCards(cardResult.data || []);
 					setInstallments(next);
+					setPaidCards(nextPaidCards);
 				}
 			} catch (loadError) {
 				if (active) {
@@ -107,54 +123,38 @@ export default function FinancialPlannerDashboard() {
 		return () => {
 			active = false;
 		};
-	}, [supabase, year]);
+	}, [supabase, year, month]);
 
 	const activeInstallments = useMemo(
 		() => installments.filter((item) => showCompleted || !item.completed),
 		[installments, showCompleted],
 	);
 	const groups = useMemo(
-		() => calculateDashboardTotals(cards, activeInstallments, month),
-		[cards, activeInstallments, month],
+		() => calculateDashboardTotals(cards, activeInstallments, month, paidCards),
+		[cards, activeInstallments, month, paidCards],
 	);
 	const expected = groups.reduce((sum, card) => sum + card.expected, 0);
 	const paid = groups.reduce((sum, card) => sum + card.paid, 0);
 
-	async function updateMonth(item, nextPaid, nextAmount) {
+	async function updateCard(card, nextPaid) {
 		if (!user) {
 			return;
 		}
-		const key = `${item.id}:${month + 1}`;
+		const key = `${card.id}:${year}:${month + 1}`;
 		setSaving(key);
 		const payload = {
 			user_id: user.id,
-			installment_id: item.id,
+			card_id: card.id,
 			planner_year: year,
 			planner_month: month + 1,
-			amount: nextAmount ?? Number(item.monthlyPlan[month] || 0),
-			paid: nextPaid ?? Boolean(item.paidMonths[month]),
+			paid: nextPaid,
 			updated_at: new Date().toISOString(),
 		};
-		const result = await supabase.from(MONTH_TABLE).upsert(payload);
+		const result = await supabase.from(CARD_MONTH_TABLE).upsert(payload);
 		if (result.error) {
 			setError(result.error.message);
 		} else {
-			setInstallments((current) =>
-				current.map((entry) =>
-					entry.id === item.id
-						? {
-								...entry,
-								monthlyPlan: entry.monthlyPlan.map((value, index) =>
-									index === month ? payload.amount : value,
-								),
-								paidMonths: entry.paidMonths.map((value, index) =>
-									index === month ? payload.paid : value,
-								),
-								completed: false,
-							}
-						: entry,
-				),
-			);
+			setPaidCards((current) => new Map(current).set(card.id, payload.paid));
 		}
 		setSaving(null);
 	}
@@ -220,15 +220,31 @@ export default function FinancialPlannerDashboard() {
 				.map((card) => (
 					<Card key={card.id}>
 						<CardHeader className="border-b border-border/70 bg-secondary/20">
-							<CardTitle className="flex items-center justify-between">
+							<CardTitle className="flex flex-wrap items-center justify-between gap-3">
 								<span>{card.name}</span>
-								<Badge variant="secondary">{amount(card.expected)}</Badge>
+								<div className="flex items-center gap-2">
+									<Badge variant="secondary">{amount(card.expected)}</Badge>
+									<Button
+										variant={card.cardPaid ? "secondary" : "outline"}
+										disabled={saving === `${card.id}:${year}:${month + 1}`}
+										onClick={() => updateCard(card, !card.cardPaid)}
+									>
+										{saving === `${card.id}:${year}:${month + 1}` ? (
+											<LoaderCircle className="animate-spin" />
+										) : card.cardPaid ? (
+											<>
+												<Check /> Paid
+											</>
+										) : (
+											"Mark paid"
+										)}
+									</Button>
+								</div>
 							</CardTitle>
 						</CardHeader>
 						<CardContent className="space-y-3 p-4">
 							{card.items.map((entry) => {
 								const item = entry;
-								const isSaving = saving === `${item.id}:${month + 1}`;
 								return (
 									<div
 										key={item.id}
@@ -240,37 +256,7 @@ export default function FinancialPlannerDashboard() {
 												Installment {item.startMonth + 1}–{item.endMonth + 1}
 											</p>
 										</div>
-										<div className="flex items-center gap-2">
-											<Input
-												className="w-28 text-right"
-												inputMode="decimal"
-												value={formatMoneyInput(item.month.amount)}
-												aria-label={`${item.name} amount`}
-												onChange={(event) => {
-													const value = parseMoneyInput(event.target.value);
-													if (value !== null) {
-														updateMonth(item, undefined, value);
-													}
-												}}
-											/>
-											<Button
-												variant={item.month.paid ? "secondary" : "outline"}
-												disabled={isSaving}
-												onClick={() => updateMonth(item, !item.month.paid)}
-											>
-												{isSaving ? (
-													<LoaderCircle className="animate-spin" />
-												) : item.month.paid ? (
-													<>
-														<Check /> Paid
-													</>
-												) : (
-													<>
-														<Circle /> Mark paid
-													</>
-												)}
-											</Button>
-										</div>
+										<p className="font-semibold tabular-nums">{amount(item.month.amount)}</p>
 									</div>
 								);
 							})}
