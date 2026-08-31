@@ -818,11 +818,24 @@ export default function FinancialPlannerTool() {
 							</div>
 						</div>
 						<div className="space-y-2">
-							<Label>Monthly payment schedule</Label>
-							<div className="max-h-56 space-y-2 overflow-y-auto rounded-xl border border-border/70 p-3">
+							<Label htmlFor="installment-monthly">Fixed monthly payment</Label>
+							<Input
+								id="installment-monthly"
+								inputMode="decimal"
+								value={installmentForm.monthly}
+								onChange={(event) => updateInstallmentField("monthly", event.target.value)}
+								required
+							/>
+							<p className="text-xs text-muted-foreground">
+								This amount will be used for every month in the selected payment window.
+							</p>
+						</div>
+						<div className="space-y-2">
+							<Label>Payment window preview</Label>
+							<div className="max-h-32 overflow-y-auto rounded-xl border border-border/70 bg-background/40 p-3">
 								{monthsBetween(installmentForm.startMonth, installmentForm.endMonth).map(
 									(entry) => (
-										<div key={entry.key} className="flex items-center justify-between gap-3">
+										<div key={entry.key} className="flex items-center justify-between gap-3 py-1">
 											<span className="text-sm">
 												{new Date(`${entry.key}-01T00:00:00Z`).toLocaleDateString("en", {
 													month: "long",
@@ -830,21 +843,9 @@ export default function FinancialPlannerTool() {
 													timeZone: "UTC",
 												})}
 											</span>
-											<Input
-												className="w-32"
-												inputMode="decimal"
-												value={installmentForm.monthlyPlan[entry.key] ?? installmentForm.monthly}
-												onChange={(event) =>
-													setInstallmentForm((current) => ({
-														...current,
-														monthlyPlan: {
-															...current.monthlyPlan,
-															[entry.key]: event.target.value,
-														},
-													}))
-												}
-												required
-											/>
+											<span className="font-medium tabular-nums">
+												{installmentForm.monthly || "฿0"}
+											</span>
 										</div>
 									),
 								)}
