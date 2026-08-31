@@ -120,9 +120,18 @@ function MonthYearPicker({ id, label, value, onChange }) {
 			{open ? (
 				<dialog
 					open
-					className="absolute z-50 mt-2 rounded-xl border border-border bg-card p-3 shadow-xl"
+					className="absolute left-0 top-full z-50 m-0 mt-2 w-[min(20rem,calc(100vw-2rem))] rounded-2xl border border-border/80 bg-card p-4 text-card-foreground shadow-2xl shadow-black/25"
 					aria-label={`${label} picker`}
 				>
+					<div className="mb-4 flex items-start justify-between gap-3">
+						<div>
+							<p className="text-sm font-semibold">Choose a month</p>
+							<p className="mt-1 text-xs text-muted-foreground">
+								Select the payment window {label.toLowerCase()}.
+							</p>
+						</div>
+						<Icons.CalendarDays className="mt-0.5 size-4 text-primary" aria-hidden="true" />
+					</div>
 					<div className="mb-3">
 						<label htmlFor={`${id}-year`} className="sr-only">
 							{label} year
@@ -131,7 +140,7 @@ function MonthYearPicker({ id, label, value, onChange }) {
 							id={`${id}-year`}
 							value={selectedYear}
 							onChange={(event) => onChange(`${event.target.value}-${selectedMonth}`)}
-							className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+							className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm font-semibold transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 						>
 							{years.map((year) => (
 								<option key={year} value={year}>
@@ -148,7 +157,7 @@ function MonthYearPicker({ id, label, value, onChange }) {
 								<button
 									key={month}
 									type="button"
-									className={`min-h-11 rounded-lg px-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${selected ? "bg-primary text-primary-foreground" : "hover:bg-accent"}`}
+									className={`min-h-11 rounded-lg px-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${selected ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20" : "bg-secondary/35 text-muted-foreground hover:bg-accent hover:text-accent-foreground"}`}
 									aria-pressed={selected}
 									onClick={() => {
 										onChange(`${selectedYear}-${month}`);
