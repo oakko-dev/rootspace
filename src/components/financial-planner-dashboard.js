@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import {
 	calculateDashboardTotals,
 	installmentMonthBounds,
+	installmentIsComplete,
 	PLANNER_MONTHS,
 } from "@/lib/financial-planner";
 import { formatMoneyInput, parseMoneyInput } from "@/lib/money-input";
@@ -47,11 +48,7 @@ export default function FinancialPlannerDashboard() {
 				const [cardResult, installmentResult, monthResult] = await Promise.all([
 					supabase.from(CARD_TABLE).select("*").eq("user_id", auth.data.user.id).order("name"),
 					supabase.from(YEAR_TABLE).select("*").eq("user_id", auth.data.user.id),
-					supabase
-						.from(MONTH_TABLE)
-						.select("*")
-						.eq("user_id", auth.data.user.id)
-						.eq("planner_year", year),
+					supabase.from(MONTH_TABLE).select("*").eq("user_id", auth.data.user.id),
 				]);
 				if (cardResult.error) {
 					throw cardResult.error;
@@ -64,10 +61,16 @@ export default function FinancialPlannerDashboard() {
 				}
 				const monthly = new Map(
 					(monthResult.data || []).map((row) => [
-						`${row.installment_id}:${row.planner_month}`,
+						`${row.installment_id}:${row.planner_year}:${row.planner_month}`,
 						row,
 					]),
 				);
+				const paidByInstallment = new Map();
+				for (const row of monthResult.data || []) {
+					const paid = paidByInstallment.get(row.installment_id) || new Map();
+					paid.set(`${row.planner_year}-${String(row.planner_month).padStart(2, "0")}`, row.paid);
+					paidByInstallment.set(row.installment_id, paid);
+				}
 				const next = (installmentResult.data || [])
 					.map((item) => ({
 						...item,
@@ -75,17 +78,15 @@ export default function FinancialPlannerDashboard() {
 						...installmentMonthBounds(item, year),
 						monthlyPlan: PLANNER_MONTHS.map(
 							(_, index) =>
-								monthly.get(`${item.id}:${index + 1}`)?.amount ?? Number(item.monthly || 0),
+								monthly.get(`${item.id}:${year}:${index + 1}`)?.amount ?? Number(item.monthly || 0),
 						),
 						paidMonths: PLANNER_MONTHS.map(
-							(_, index) => monthly.get(`${item.id}:${index + 1}`)?.paid ?? false,
+							(_, index) => monthly.get(`${item.id}:${year}:${index + 1}`)?.paid ?? false,
 						),
 					}))
 					.map((item) => ({
 						...item,
-						completed: PLANNER_MONTHS.slice(item.startMonth, item.endMonth + 1).every(
-							(_, index) => item.paidMonths[item.startMonth + index],
-						),
+						completed: installmentIsComplete(item, paidByInstallment.get(item.id) || new Map()),
 					}));
 				if (active) {
 					setUser(auth.data.user);
@@ -149,10 +150,7 @@ export default function FinancialPlannerDashboard() {
 								paidMonths: entry.paidMonths.map((value, index) =>
 									index === month ? payload.paid : value,
 								),
-								completed: PLANNER_MONTHS.slice(entry.startMonth, entry.endMonth + 1).every(
-									(_, index) =>
-										index === month ? payload.paid : entry.paidMonths[entry.startMonth + index],
-								),
+								completed: false,
 							}
 						: entry,
 				),

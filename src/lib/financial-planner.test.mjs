@@ -5,6 +5,7 @@ import {
 	calculateCardTotals,
 	calculateDashboardTotals,
 	installmentMonthBounds,
+	installmentIsComplete,
 	monthsBetween,
 	monthIsActive,
 	normalizeMonthlyValues,
@@ -27,6 +28,22 @@ test("builds inclusive month ranges across calendar years", () => {
 			endMonth: 1,
 			active: true,
 		},
+	);
+});
+
+test("does not complete a cross-year installment when only the first year is paid", () => {
+	const paid = new Map([
+		["2026-08", true],
+		["2026-09", true],
+		["2026-10", true],
+		["2026-11", true],
+		["2026-12", true],
+		["2027-01", false],
+		["2027-02", false],
+	]);
+	assert.equal(
+		installmentIsComplete({ start_month: "2026-08-01", end_month: "2027-02-01" }, paid),
+		false,
 	);
 });
 

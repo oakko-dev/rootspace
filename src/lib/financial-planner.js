@@ -55,6 +55,13 @@ export function installmentMonthBounds(item, year) {
 	};
 }
 
+export function installmentIsComplete(item, paidByMonth) {
+	return monthsBetween(
+		new Date(item.start_month || item.startDate).toISOString().slice(0, 7),
+		new Date(item.end_month || item.endDate).toISOString().slice(0, 7),
+	).every((entry) => paidByMonth.get(entry.key) === true);
+}
+
 export function emptyMonthlyValues(value = 0) {
 	return PLANNER_MONTHS.map(() => Number(value || 0));
 }
