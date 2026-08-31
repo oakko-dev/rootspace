@@ -164,7 +164,10 @@ export function getDashboardMonth(installment, monthIndex) {
 export function calculateDashboardTotals(cards, installments, monthIndex) {
 	return cards.map((card) => {
 		const items = (installments || [])
-			.filter((item) => item.cardId === card.id && monthIsActive(item, monthIndex))
+			.filter(
+				(item) =>
+					item.cardId === card.id && item.active !== false && monthIsActive(item, monthIndex),
+			)
 			.map((item) => ({ ...item, month: getDashboardMonth(item, monthIndex) }));
 		return {
 			...card,

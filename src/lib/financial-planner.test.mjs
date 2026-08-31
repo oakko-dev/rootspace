@@ -47,6 +47,16 @@ test("does not complete a cross-year installment when only the first year is pai
 	);
 });
 
+test("does not show an installment in the same month of an inactive year", () => {
+	const [card] = calculateDashboardTotals(
+		[{ id: "card-1", name: "Firstchoice" }],
+		[{ id: "loan-1", cardId: "card-1", monthly: 100, startMonth: 0, endMonth: 0, active: false }],
+		0,
+	);
+	assert.equal(card.items.length, 0);
+	assert.equal(card.expected, 0);
+});
+
 test("calculates annual cash flow from income, deductions, expenses, and installments", () => {
 	const totals = calculateAnnualTotals({
 		income: [{ monthly: 100, plan: [100, 200] }],
