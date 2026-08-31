@@ -149,6 +149,8 @@ function MonthYearPicker({ id, label, value, onChange }) {
 						<dialog
 							open
 							data-month-picker-portal="true"
+							onPointerDownCapture={(event) => event.stopPropagation()}
+							onClickCapture={(event) => event.stopPropagation()}
 							className="fixed z-[100] m-0 rounded-2xl border border-border/80 bg-card p-4 text-card-foreground shadow-2xl shadow-black/25"
 							style={{ left: position.left, top: position.top, width: position.width }}
 							aria-label={`${label} picker`}
@@ -869,16 +871,8 @@ export default function FinancialPlannerTool() {
 			<Dialog open={installmentDialog} onOpenChange={setInstallmentDialog}>
 				<DialogContent
 					className="max-w-lg overflow-hidden border-border/80 bg-card p-0"
-					onPointerDownOutside={(event) => {
-						if (event.target.closest?.("[data-month-picker-portal]")) {
-							event.preventDefault();
-						}
-					}}
-					onInteractOutside={(event) => {
-						if (event.target.closest?.("[data-month-picker-portal]")) {
-							event.preventDefault();
-						}
-					}}
+					onPointerDownOutside={(event) => event.preventDefault()}
+					onInteractOutside={(event) => event.preventDefault()}
 				>
 					<DialogHeader className="mb-0 border-b border-border/70 bg-gradient-to-br from-secondary/60 to-card px-6 py-5">
 						<div className="mb-3 flex size-10 items-center justify-center rounded-xl bg-violet-400/10 text-violet-300">
