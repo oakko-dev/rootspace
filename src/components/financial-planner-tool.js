@@ -830,27 +830,6 @@ export default function FinancialPlannerTool() {
 								This amount will be used for every month in the selected payment window.
 							</p>
 						</div>
-						<div className="space-y-2">
-							<Label>Payment window preview</Label>
-							<div className="max-h-32 overflow-y-auto rounded-xl border border-border/70 bg-background/40 p-3">
-								{monthsBetween(installmentForm.startMonth, installmentForm.endMonth).map(
-									(entry) => (
-										<div key={entry.key} className="flex items-center justify-between gap-3 py-1">
-											<span className="text-sm">
-												{new Date(`${entry.key}-01T00:00:00Z`).toLocaleDateString("en", {
-													month: "long",
-													year: "numeric",
-													timeZone: "UTC",
-												})}
-											</span>
-											<span className="font-medium tabular-nums">
-												{installmentForm.monthly || "฿0"}
-											</span>
-										</div>
-									),
-								)}
-							</div>
-						</div>
 						<div className="flex justify-end gap-2 border-t border-border/70 pt-4">
 							<Button type="button" variant="ghost" onClick={() => setInstallmentDialog(false)}>
 								Cancel
