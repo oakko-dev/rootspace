@@ -1,8 +1,6 @@
 "use client";
 
-import { DayPicker } from "@daypicker/react";
 import * as Icons from "lucide-react";
-import "@daypicker/react/style.css";
 import { useEffect, useMemo, useState } from "react";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -100,7 +98,11 @@ function MoneyInput(props) {
 
 function MonthYearPicker({ id, label, value, onChange }) {
 	const [open, setOpen] = useState(false);
-	const selected = value ? new Date(`${value}-01T00:00:00Z`) : undefined;
+	const [selectedYear = new Date().getFullYear(), selectedMonth = "01"] = value.split("-");
+	const monthLabels = Array.from({ length: 12 }, (_, index) =>
+		new Date(Date.UTC(2000, index, 1)).toLocaleDateString("en", { month: "long", timeZone: "UTC" }),
+	);
+	const years = Array.from({ length: 101 }, (_, index) => 2000 + index);
 	return (
 		<div className="relative space-y-2">
 			<Label htmlFor={id}>{label}</Label>
@@ -112,8 +114,7 @@ function MonthYearPicker({ id, label, value, onChange }) {
 				aria-expanded={open}
 				aria-haspopup="dialog"
 			>
-				{selected?.toLocaleDateString("en", { month: "long", year: "numeric", timeZone: "UTC" }) ||
-					"Select month"}
+				{value ? `${monthLabels[Number(selectedMonth) - 1]} ${selectedYear}` : "Select month"}
 				<Icons.Calendar className="size-4 text-muted-foreground" aria-hidden="true" />
 			</button>
 			{open ? (
@@ -122,20 +123,43 @@ function MonthYearPicker({ id, label, value, onChange }) {
 					className="absolute z-50 mt-2 rounded-xl border border-border bg-card p-3 shadow-xl"
 					aria-label={`${label} picker`}
 				>
-					<DayPicker
-						mode="single"
-						selected={selected}
-						defaultMonth={selected || new Date()}
-						captionLayout="dropdown"
-						fromYear={2000}
-						toYear={2100}
-						onSelect={(date) => {
-							if (date) {
-								onChange(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`);
-								setOpen(false);
-							}
-						}}
-					/>
+					<div className="mb-3">
+						<label htmlFor={`${id}-year`} className="sr-only">
+							{label} year
+						</label>
+						<select
+							id={`${id}-year`}
+							value={selectedYear}
+							onChange={(event) => onChange(`${event.target.value}-${selectedMonth}`)}
+							className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+						>
+							{years.map((year) => (
+								<option key={year} value={year}>
+									{year}
+								</option>
+							))}
+						</select>
+					</div>
+					<div className="grid grid-cols-3 gap-2" aria-label={`${label} month options`}>
+						{monthLabels.map((monthLabel, index) => {
+							const month = String(index + 1).padStart(2, "0");
+							const selected = String(selectedMonth) === month;
+							return (
+								<button
+									key={month}
+									type="button"
+									className={`min-h-11 rounded-lg px-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${selected ? "bg-primary text-primary-foreground" : "hover:bg-accent"}`}
+									aria-pressed={selected}
+									onClick={() => {
+										onChange(`${selectedYear}-${month}`);
+										setOpen(false);
+									}}
+								>
+									{monthLabel}
+								</button>
+							);
+						})}
+					</div>
 				</dialog>
 			) : null}
 		</div>
