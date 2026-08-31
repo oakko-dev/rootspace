@@ -9,4 +9,8 @@ test("live tools expose dedicated sidebar routes with bookmarks as home", () => 
 		liveTools.map((tool) => tool.href),
 		["/", "/date-converter", "/thai-name-generator", "/json-formatter", "/financial-planner"],
 	);
+	assert.equal(
+		toolCatalog.find((tool) => tool.name === "Financial planner").children[0].name,
+		"Dashboard",
+	);
 });

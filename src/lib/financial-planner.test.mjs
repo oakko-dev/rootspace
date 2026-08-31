@@ -3,6 +3,7 @@ import test from "node:test";
 import {
 	calculateAnnualTotals,
 	calculateCardTotals,
+	calculateDashboardTotals,
 	monthIsActive,
 	normalizeMonthlyValues,
 } from "./financial-planner.js";
@@ -30,4 +31,25 @@ test("calculates card totals only for active installment months", () => {
 	);
 	assert.deepEqual(card.monthly.slice(0, 4), [0, 100, 100, 0]);
 	assert.equal(monthIsActive({ startMonth: 1, endMonth: 2 }, 2), true);
+});
+
+test("calculates dashboard totals from variable monthly amounts and payment status", () => {
+	const [card] = calculateDashboardTotals(
+		[{ id: "card-1", name: "Firstchoice" }],
+		[
+			{
+				id: "loan-1",
+				cardId: "card-1",
+				monthly: 100,
+				monthlyPlan: [80, 120],
+				paidMonths: [true, false],
+				startMonth: 0,
+				endMonth: 1,
+			},
+		],
+		1,
+	);
+	assert.equal(card.expected, 120);
+	assert.equal(card.paid, 0);
+	assert.equal(card.items[0].month.amount, 120);
 });

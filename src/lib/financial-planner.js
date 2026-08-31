@@ -108,6 +108,33 @@ export function calculateCardTotals(cards, installments) {
 	}));
 }
 
+export function getDashboardMonth(installment, monthIndex) {
+	if (!monthIsActive(installment, monthIndex)) {
+		return null;
+	}
+	const amount = Number(installment.monthlyPlan?.[monthIndex] ?? installment.monthly ?? 0);
+	return {
+		amount,
+		paid: Boolean(installment.paidMonths?.[monthIndex]),
+	};
+}
+
+export function calculateDashboardTotals(cards, installments, monthIndex) {
+	return cards.map((card) => {
+		const items = (installments || [])
+			.filter((item) => item.cardId === card.id && monthIsActive(item, monthIndex))
+			.map((item) => ({ ...item, month: getDashboardMonth(item, monthIndex) }));
+		return {
+			...card,
+			items,
+			expected: items.reduce((sum, item) => sum + item.month.amount, 0),
+			paid: items
+				.filter((item) => item.month.paid)
+				.reduce((sum, item) => sum + item.month.amount, 0),
+		};
+	});
+}
+
 export function toMonthlyRows(items, valueKey, actualKey) {
 	return (items || []).flatMap((item) =>
 		PLANNER_MONTHS.map((_, index) => ({

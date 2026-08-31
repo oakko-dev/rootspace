@@ -35,6 +35,11 @@ export const toolCatalog = [
 		href: "/financial-planner",
 		icon: "Wallet",
 		authRequired: true,
+		children: [
+			{ name: "Dashboard", href: "/financial-planner/dashboard" },
+			{ name: "Planner", href: "/financial-planner" },
+			{ name: "Credit Card Master", href: "/financial-planner/credit-card-master" },
+		],
 	},
 	{
 		name: "Installment logs",
