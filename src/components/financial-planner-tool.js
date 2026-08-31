@@ -1,8 +1,7 @@
 "use client";
 
 import * as Icons from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { useMemo, useState } from "react";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -99,42 +98,16 @@ function MoneyInput(props) {
 
 function MonthYearPicker({ id, label, value, onChange }) {
 	const [open, setOpen] = useState(false);
-	const [position, setPosition] = useState(null);
-	const triggerRef = useRef(null);
 	const [selectedYear = new Date().getFullYear(), selectedMonth = "01"] = value.split("-");
 	const monthLabels = Array.from({ length: 12 }, (_, index) =>
 		new Date(Date.UTC(2000, index, 1)).toLocaleDateString("en", { month: "long", timeZone: "UTC" }),
 	);
 	const years = Array.from({ length: 101 }, (_, index) => 2000 + index);
-	useEffect(() => {
-		if (!open || !triggerRef.current) {
-			return;
-		}
-		function updatePosition() {
-			const rect = triggerRef.current.getBoundingClientRect();
-			const width = Math.min(320, window.innerWidth - 32);
-			const left = Math.min(rect.left, window.innerWidth - width - 16);
-			const opensAbove = rect.bottom + 360 > window.innerHeight;
-			setPosition({
-				left,
-				top: opensAbove ? Math.max(16, rect.top - 360) : rect.bottom + 8,
-				width,
-			});
-		}
-		updatePosition();
-		window.addEventListener("resize", updatePosition);
-		window.addEventListener("scroll", updatePosition, true);
-		return () => {
-			window.removeEventListener("resize", updatePosition);
-			window.removeEventListener("scroll", updatePosition, true);
-		};
-	}, [open]);
 	return (
 		<div className="relative space-y-2">
 			<Label htmlFor={id}>{label}</Label>
 			<button
 				id={id}
-				ref={triggerRef}
 				type="button"
 				className="flex h-11 w-full items-center justify-between rounded-xl border border-input bg-background px-3 text-left text-sm outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
 				onClick={() => setOpen((current) => !current)}
@@ -144,67 +117,60 @@ function MonthYearPicker({ id, label, value, onChange }) {
 				{value ? `${monthLabels[Number(selectedMonth) - 1]} ${selectedYear}` : "Select month"}
 				<Icons.Calendar className="size-4 text-muted-foreground" aria-hidden="true" />
 			</button>
-			{open && position
-				? createPortal(
-						<dialog
-							open
-							data-month-picker-portal="true"
-							onPointerDownCapture={(event) => event.stopPropagation()}
-							onClickCapture={(event) => event.stopPropagation()}
-							className="fixed z-[100] m-0 rounded-2xl border border-border/80 bg-card p-4 text-card-foreground shadow-2xl shadow-black/25"
-							style={{ left: position.left, top: position.top, width: position.width }}
-							aria-label={`${label} picker`}
+			{open ? (
+				<dialog
+					open
+					className="absolute left-0 top-full z-[100] m-0 mt-2 w-[min(20rem,calc(100vw-2rem))] rounded-2xl border border-border/80 bg-card p-4 text-card-foreground shadow-2xl shadow-black/25"
+					aria-label={`${label} picker`}
+				>
+					<div className="mb-4 flex items-start justify-between gap-3">
+						<div>
+							<p className="text-sm font-semibold">Choose a month</p>
+							<p className="mt-1 text-xs text-muted-foreground">
+								Select the payment window {label.toLowerCase()}.
+							</p>
+						</div>
+						<Icons.CalendarDays className="mt-0.5 size-4 text-primary" aria-hidden="true" />
+					</div>
+					<div className="mb-3">
+						<label htmlFor={`${id}-year`} className="sr-only">
+							{label} year
+						</label>
+						<select
+							id={`${id}-year`}
+							value={selectedYear}
+							onChange={(event) => onChange(`${event.target.value}-${selectedMonth}`)}
+							className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm font-semibold transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 						>
-							<div className="mb-4 flex items-start justify-between gap-3">
-								<div>
-									<p className="text-sm font-semibold">Choose a month</p>
-									<p className="mt-1 text-xs text-muted-foreground">
-										Select the payment window {label.toLowerCase()}.
-									</p>
-								</div>
-								<Icons.CalendarDays className="mt-0.5 size-4 text-primary" aria-hidden="true" />
-							</div>
-							<div className="mb-3">
-								<label htmlFor={`${id}-year`} className="sr-only">
-									{label} year
-								</label>
-								<select
-									id={`${id}-year`}
-									value={selectedYear}
-									onChange={(event) => onChange(`${event.target.value}-${selectedMonth}`)}
-									className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm font-semibold transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+							{years.map((year) => (
+								<option key={year} value={year}>
+									{year}
+								</option>
+							))}
+						</select>
+					</div>
+					<div className="grid grid-cols-3 gap-2" aria-label={`${label} month options`}>
+						{monthLabels.map((monthLabel, index) => {
+							const month = String(index + 1).padStart(2, "0");
+							const selected = String(selectedMonth) === month;
+							return (
+								<button
+									key={month}
+									type="button"
+									className={`min-h-11 rounded-lg px-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${selected ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20" : "bg-secondary/35 text-muted-foreground hover:bg-accent hover:text-accent-foreground"}`}
+									aria-pressed={selected}
+									onClick={() => {
+										onChange(`${selectedYear}-${month}`);
+										setOpen(false);
+									}}
 								>
-									{years.map((year) => (
-										<option key={year} value={year}>
-											{year}
-										</option>
-									))}
-								</select>
-							</div>
-							<div className="grid grid-cols-3 gap-2" aria-label={`${label} month options`}>
-								{monthLabels.map((monthLabel, index) => {
-									const month = String(index + 1).padStart(2, "0");
-									const selected = String(selectedMonth) === month;
-									return (
-										<button
-											key={month}
-											type="button"
-											className={`min-h-11 rounded-lg px-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${selected ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20" : "bg-secondary/35 text-muted-foreground hover:bg-accent hover:text-accent-foreground"}`}
-											aria-pressed={selected}
-											onClick={() => {
-												onChange(`${selectedYear}-${month}`);
-												setOpen(false);
-											}}
-										>
-											{monthLabel}
-										</button>
-									);
-								})}
-							</div>
-						</dialog>,
-						document.body,
-					)
-				: null}
+									{monthLabel}
+								</button>
+							);
+						})}
+					</div>
+				</dialog>
+			) : null}
 		</div>
 	);
 }
@@ -869,11 +835,7 @@ export default function FinancialPlannerTool() {
 				</CardContent>
 			</Card>
 			<Dialog open={installmentDialog} onOpenChange={setInstallmentDialog}>
-				<DialogContent
-					className="max-w-lg overflow-hidden border-border/80 bg-card p-0"
-					onPointerDownOutside={(event) => event.preventDefault()}
-					onInteractOutside={(event) => event.preventDefault()}
-				>
+				<DialogContent className="max-w-lg overflow-visible border-border/80 bg-card p-0">
 					<DialogHeader className="mb-0 border-b border-border/70 bg-gradient-to-br from-secondary/60 to-card px-6 py-5">
 						<div className="mb-3 flex size-10 items-center justify-center rounded-xl bg-violet-400/10 text-violet-300">
 							<Icons.CreditCard className="size-5" />
