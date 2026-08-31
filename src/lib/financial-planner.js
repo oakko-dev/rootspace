@@ -20,6 +20,41 @@ export const EXPENSE_GROUPS = [
 	{ key: "personal", label: "Personal" },
 ];
 
+export function monthsBetween(start, end) {
+	const startDate = new Date(`${start}-01T00:00:00Z`);
+	const endDate = new Date(`${end}-01T00:00:00Z`);
+	if (
+		!start ||
+		!end ||
+		Number.isNaN(startDate.getTime()) ||
+		Number.isNaN(endDate.getTime()) ||
+		startDate > endDate
+	) {
+		return [];
+	}
+	const months = [];
+	let date = new Date(startDate);
+	while (date <= endDate) {
+		months.push({
+			year: date.getUTCFullYear(),
+			month: date.getUTCMonth(),
+			key: date.toISOString().slice(0, 7),
+		});
+		date = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 1));
+	}
+	return months;
+}
+
+export function installmentMonthBounds(item, year) {
+	const start = new Date(item.start_month || item.startDate);
+	const end = new Date(item.end_month || item.endDate);
+	return {
+		startMonth: year === start.getUTCFullYear() ? start.getUTCMonth() : 0,
+		endMonth: year === end.getUTCFullYear() ? end.getUTCMonth() : 11,
+		active: year >= start.getUTCFullYear() && year <= end.getUTCFullYear(),
+	};
+}
+
 export function emptyMonthlyValues(value = 0) {
 	return PLANNER_MONTHS.map(() => Number(value || 0));
 }

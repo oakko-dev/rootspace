@@ -7,7 +7,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { calculateDashboardTotals, PLANNER_MONTHS } from "@/lib/financial-planner";
+import {
+	calculateDashboardTotals,
+	installmentMonthBounds,
+	PLANNER_MONTHS,
+} from "@/lib/financial-planner";
 import { formatMoneyInput, parseMoneyInput } from "@/lib/money-input";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
@@ -42,11 +46,7 @@ export default function FinancialPlannerDashboard() {
 				}
 				const [cardResult, installmentResult, monthResult] = await Promise.all([
 					supabase.from(CARD_TABLE).select("*").eq("user_id", auth.data.user.id).order("name"),
-					supabase
-						.from(YEAR_TABLE)
-						.select("*")
-						.eq("user_id", auth.data.user.id)
-						.eq("planner_year", year),
+					supabase.from(YEAR_TABLE).select("*").eq("user_id", auth.data.user.id),
 					supabase
 						.from(MONTH_TABLE)
 						.select("*")
@@ -72,8 +72,7 @@ export default function FinancialPlannerDashboard() {
 					.map((item) => ({
 						...item,
 						cardId: item.card_id,
-						startMonth: new Date(item.start_month).getUTCMonth(),
-						endMonth: new Date(item.end_month).getUTCMonth(),
+						...installmentMonthBounds(item, year),
 						monthlyPlan: PLANNER_MONTHS.map(
 							(_, index) =>
 								monthly.get(`${item.id}:${index + 1}`)?.amount ?? Number(item.monthly || 0),

@@ -6,13 +6,19 @@ import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { announceBookmarkBoardUser, writeBookmarkBoardUser } from "@/lib/bookmark-board-user";
 import {
 	calculateAnnualTotals,
 	calculateCardTotals,
+	installmentMonthBounds,
+	monthsBetween,
 	PLANNER_MONTHS,
 	normalizeMonthlyValues,
 } from "@/lib/financial-planner";
+import { formatMoneyInput, parseMoneyInput } from "@/lib/money-input";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 const TABLES = {
@@ -22,16 +28,72 @@ const TABLES = {
 	expenses: "financial_planner_expenses",
 	expenseMonths: "financial_planner_expense_months",
 	installments: "financial_planner_installments",
-	incomeActuals: "financial_planner_income_actuals",
-	deductionActuals: "financial_planner_deduction_actuals",
+	installmentMonths: "financial_planner_installment_months",
 };
 
 function createId() {
 	return globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
 }
 
+/**
+ * Formats a numeric planner total with the application's currency symbol.
+ * @param {number} value - The numeric amount to format.
+ * @returns {string} The formatted currency amount.
+ */
 function formatMoney(value) {
-	return `฿${Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+	return `฿${formatMoneyInput(Number(value || 0))}`;
+}
+
+/** Keeps invalid edits visible while focused and commits only valid money values.
+ * @param {{ value: string|number, onChange: (value: number) => void, className?: string }} props - Input props.
+ * @returns {JSX.Element} The controlled money input.
+ */
+function MoneyInput(props) {
+	const { value, onChange, className } = props;
+	const [focused, setFocused] = useState(false);
+	const [rawValue, setRawValue] = useState(() => formatMoneyInput(value));
+
+	/**
+	 * Commits valid edits while retaining malformed text until blur.
+	 * @param {{ target: { value: string } }} event - The input change event.
+	 * @returns {void}
+	 */
+	function handleChange(event) {
+		const nextRawValue = event.target.value;
+		setRawValue(nextRawValue);
+		const parsed = parseMoneyInput(nextRawValue);
+		if (parsed !== null) {
+			onChange(parsed);
+		} else if (!nextRawValue.trim()) {
+			onChange(0);
+		}
+	}
+
+	/** Formats the committed value after editing ends. @returns {void} */
+	function handleBlur() {
+		const parsed = parseMoneyInput(rawValue);
+		const nextValue = parsed ?? Number(value || 0);
+		if (parsed !== null) {
+			onChange(parsed);
+		}
+		setRawValue(formatMoneyInput(nextValue));
+		setFocused(false);
+	}
+
+	return (
+		<Input
+			type="text"
+			inputMode="decimal"
+			value={focused ? rawValue : formatMoneyInput(value)}
+			onFocus={() => {
+				setRawValue(formatMoneyInput(value));
+				setFocused(true);
+			}}
+			onChange={handleChange}
+			onBlur={handleBlur}
+			className={className}
+		/>
+	);
 }
 
 function emptyYear() {
@@ -52,47 +114,43 @@ async function loadYear(supabase, userId, year) {
 	const queries = await Promise.all(
 		Object.entries(TABLES).map(async ([key, table]) => {
 			let query = supabase.from(table).select("*").eq("user_id", userId);
-			if (key !== "cards") {
+			if (key !== "cards" && key !== "installments") {
 				query = query.eq("planner_year", year);
 			}
 			return [key, await query];
 		}),
 	);
 	const results = new Map(queries);
-	const monthlyResult = results.get("expenseMonths");
-	if (monthlyResult.error && !["PGRST205", "42P01"].includes(monthlyResult.error.code)) {
-		throw monthlyResult.error;
-	}
+	const optionalMonthlyTables = new Set(["expenseMonths", "installmentMonths"]);
 	for (const [key, result] of results) {
-		if (key !== "expenseMonths" && result.error) {
+		if (!optionalMonthlyTables.has(key) && result.error) {
+			throw result.error;
+		}
+		if (
+			optionalMonthlyTables.has(key) &&
+			result.error &&
+			!["PGRST205", "42P01"].includes(result.error.code)
+		) {
 			throw result.error;
 		}
 	}
 	const rows = (key) => results.get(key)?.data || [];
 	const plans = monthlyMap(rows("expenseMonths"), "planned_amount");
-	const actuals = monthlyMap(rows("expenseMonths"), "actual_amount");
-	const incomeActuals = monthlyMap(rows("incomeActuals"), "amount", "income_id");
-	const deductionActuals = monthlyMap(rows("deductionActuals"), "amount", "deduction_id");
+	const installmentPlans = monthlyMap(rows("installmentMonths"), "amount", "installment_id");
 	return {
 		cards: rows("cards"),
 		income: rows("income").map((item) => {
-			const plan = normalizeMonthlyValues(null, item.monthly);
+			const plan = normalizeMonthlyValues(item.monthly, 0);
 			return {
 				...item,
 				plan,
-				actual: PLANNER_MONTHS.map(
-					(_, month) => incomeActuals.get(item.id)?.[month] ?? plan[month],
-				),
 			};
 		}),
 		deductions: rows("deductions").map((item) => {
-			const plan = normalizeMonthlyValues(null, item.monthly);
+			const plan = normalizeMonthlyValues(item.monthly, 0);
 			return {
 				...item,
 				plan,
-				actual: PLANNER_MONTHS.map(
-					(_, month) => deductionActuals.get(item.id)?.[month] ?? plan[month],
-				),
 			};
 		}),
 		expenses: rows("expenses").map((item) => ({
@@ -100,22 +158,54 @@ async function loadYear(supabase, userId, year) {
 			plan: PLANNER_MONTHS.map(
 				(_, month) => plans.get(item.id)?.[month] ?? Number(item.amount || 0),
 			),
-			actual: PLANNER_MONTHS.map((_, month) => actuals.get(item.id)?.[month] ?? 0),
 		})),
-		installments: rows("installments").map((item) => ({
-			...item,
-			cardId: item.card_id,
-			startMonth: new Date(item.start_month).getUTCMonth(),
-			endMonth: new Date(item.end_month).getUTCMonth(),
-		})),
+		installments: rows("installments")
+			.map((item) => ({
+				...item,
+				...installmentMonthBounds(item, year),
+				cardId: item.card_id,
+				monthlyPlan: PLANNER_MONTHS.map(
+					(_, month) => installmentPlans.get(item.id)?.[month] ?? Number(item.monthly || 0),
+				),
+			}))
+			.filter((item) => item.active),
 	};
 }
 
 function AnnualTable({ title, rows, field, onChange, onAdd, onRemove }) {
+	const sectionMeta = {
+		Income: {
+			icon: Icons.TrendingUp,
+			tone: "text-emerald-300",
+			description: "Money coming in each month",
+		},
+		Deductions: {
+			icon: Icons.ArrowDownToLine,
+			tone: "text-amber-300",
+			description: "Tax, savings, and automatic deductions",
+		},
+		"Planned expenses": {
+			icon: Icons.ShoppingBag,
+			tone: "text-rose-300",
+			description: "Recurring costs and spending plans",
+		},
+	};
+	const meta = sectionMeta[title] || sectionMeta.Income;
+	const SectionIcon = meta.icon;
 	return (
-		<Card>
-			<CardHeader className="flex-row items-center justify-between gap-3">
-				<CardTitle>{title}</CardTitle>
+		<Card className="overflow-hidden">
+			<CardHeader className="flex-row items-center justify-between gap-3 border-b border-border/70 bg-secondary/20">
+				<div className="flex items-center gap-3">
+					<div
+						className={`flex size-10 items-center justify-center rounded-xl bg-background ${meta.tone}`}
+					>
+						<SectionIcon className="size-5" />
+					</div>
+					<div>
+						<CardTitle>{title}</CardTitle>
+						<p className="mt-1 text-xs text-muted-foreground">{meta.description}</p>
+					</div>
+				</div>
 				<Button type="button" size="sm" variant="outline" onClick={onAdd}>
 					<Icons.Plus className="size-4" /> Add row
 				</Button>
@@ -124,9 +214,9 @@ function AnnualTable({ title, rows, field, onChange, onAdd, onRemove }) {
 				<table className="min-w-[1100px] w-full text-sm">
 					<thead className="border-y border-border bg-muted/30 text-left text-xs text-muted-foreground">
 						<tr>
-							<th className="sticky left-0 z-10 bg-card px-4 py-3">Item</th>
+							<th className="sticky left-0 z-10 bg-card px-4 py-3 font-semibold">Item</th>
 							{PLANNER_MONTHS.map((month) => (
-								<th key={month} className="px-2 py-3 text-right">
+								<th key={month} className="px-2 py-3 text-right font-medium">
 									{month}
 								</th>
 							))}
@@ -141,17 +231,15 @@ function AnnualTable({ title, rows, field, onChange, onAdd, onRemove }) {
 									<Input
 										value={item.name}
 										onChange={(event) => onChange(item.id, "name", event.target.value)}
-										className="min-w-40"
+										className="min-w-40 border-transparent bg-transparent font-medium shadow-none focus:border-input focus:bg-background"
 									/>
 								</td>
 								{PLANNER_MONTHS.map((_, month) => (
 									<td key={month} className="px-1 py-2">
-										<Input
-											type="number"
-											step="0.01"
+										<MoneyInput
 											value={item[field]?.[month] ?? 0}
-											onChange={(event) => onChange(item.id, field, month, event.target.value)}
-											className="w-24 text-right"
+											onChange={(value) => onChange(item.id, field, month, value)}
+											className="w-24 border-transparent bg-transparent text-right tabular-nums shadow-none focus:border-input focus:bg-background"
 										/>
 									</td>
 								))}
@@ -189,6 +277,18 @@ export default function FinancialPlannerTool() {
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState("");
 	const [saving, setSaving] = useState("");
+	const [addDialog, setAddDialog] = useState({ open: false, group: "income" });
+	const [addName, setAddName] = useState("");
+	const [installmentDialog, setInstallmentDialog] = useState(false);
+	const [savingInstallment, setSavingInstallment] = useState(false);
+	const [installmentForm, setInstallmentForm] = useState({
+		name: "",
+		cardId: "",
+		monthly: "0",
+		startMonth: "",
+		endMonth: "",
+		monthlyPlan: {},
+	});
 
 	useEffect(() => {
 		let active = true;
@@ -202,6 +302,8 @@ export default function FinancialPlannerTool() {
 				const next = await loadYear(supabase, auth.user.id, year);
 				if (active) {
 					setUser(auth.user);
+					writeBookmarkBoardUser(auth.user.id);
+					announceBookmarkBoardUser({ id: auth.user.id, email: auth.user.email });
 					setData(next);
 				}
 			} catch (loadError) {
@@ -240,14 +342,18 @@ export default function FinancialPlannerTool() {
 				const values = [
 					...(item[field] || normalizeMonthlyValues(null, item.monthly || item.amount)),
 				];
-				values[monthOrValue] = Math.max(0, Number(maybeValue || 0));
+				const parsed = parseMoneyInput(maybeValue);
+				if (parsed === null) {
+					return item;
+				}
+				values[monthOrValue] = parsed;
 				return { ...item, [field]: values };
 			}),
 		}));
 	}
 
-	function addRow(group) {
-		const name = Reflect.get(globalThis, "prompt")(`Name for new ${group} item:`)?.trim();
+	function addRow(group, nameValue = addName) {
+		const name = nameValue.trim();
 		if (!name) {
 			return;
 		}
@@ -259,6 +365,13 @@ export default function FinancialPlannerTool() {
 			actual: normalizeMonthlyValues(null, 0),
 		};
 		setData((current) => ({ ...current, [group]: [...current[group], row] }));
+		setAddName("");
+		setAddDialog({ open: false, group });
+	}
+
+	function openAddDialog(group) {
+		setAddName("");
+		setAddDialog({ open: true, group });
 	}
 
 	function removeRow(group, itemId) {
@@ -271,31 +384,77 @@ export default function FinancialPlannerTool() {
 	}
 
 	function addInstallment() {
-		const name = Reflect.get(globalThis, "prompt")("Installment item name:")?.trim();
-		if (!name || data.cards.length === 0) {
+		if (data.cards.length === 0) {
 			return;
 		}
-		const cardName = Reflect.get(
-			globalThis,
-			"prompt",
-		)(`Card name (${data.cards.map((card) => card.name).join(", ")}):`)?.trim();
-		const card = data.cards.find((item) => item.name === cardName) || data.cards[0];
-		const monthly = Number(Reflect.get(globalThis, "prompt")("Monthly payment:", "0") || 0);
-		const startMonth = Math.max(
-			0,
-			Math.min(11, Number(Reflect.get(globalThis, "prompt")("Start month (1-12):", "1") || 1) - 1),
-		);
-		const endMonth = Math.max(
-			startMonth,
-			Math.min(11, Number(Reflect.get(globalThis, "prompt")("End month (1-12):", "12") || 12) - 1),
-		);
+		setInstallmentForm({
+			name: "",
+			cardId: data.cards[0].id,
+			monthly: "0",
+			startMonth: `${year}-01`,
+			endMonth: `${year}-12`,
+			monthlyPlan: {},
+		});
+		setInstallmentDialog(true);
+	}
+
+	async function saveInstallment(event) {
+		event?.preventDefault();
+		const name = installmentForm.name.trim();
+		const card = data.cards.find((item) => item.id === installmentForm.cardId) || data.cards[0];
+		const monthly = parseMoneyInput(installmentForm.monthly);
+		const range = monthsBetween(installmentForm.startMonth, installmentForm.endMonth);
+		if (!name || !card || monthly === null || !range.length) {
+			return;
+		}
+		const startDate = new Date(`${installmentForm.startMonth}-01T00:00:00Z`);
+		const endDate = new Date(`${installmentForm.endMonth}-01T00:00:00Z`);
+		const item = {
+			id: createId(),
+			name,
+			cardId: card.id,
+			monthly,
+			startDate: startDate.toISOString(),
+			endDate: endDate.toISOString(),
+			startMonth: startDate.getUTCFullYear() === year ? startDate.getUTCMonth() : 0,
+			endMonth: endDate.getUTCFullYear() === year ? endDate.getUTCMonth() : 11,
+			monthlyPlan: PLANNER_MONTHS.map((_, monthIndex) => {
+				const key = `${year}-${String(monthIndex + 1).padStart(2, "0")}`;
+				return parseMoneyInput(installmentForm.monthlyPlan[key] ?? String(monthly)) ?? monthly;
+			}),
+		};
+		if (!user) {
+			return;
+		}
+		setSavingInstallment(true);
+		const now = new Date().toISOString();
+		const { error: insertError } = await supabase.from(TABLES.installments).insert({
+			user_id: user.id,
+			id: item.id,
+			planner_year: year,
+			card_id: item.cardId,
+			name: item.name,
+			notes: "",
+			monthly: item.monthly,
+			start_month: startDate.toISOString(),
+			end_month: endDate.toISOString(),
+			updated_at: now,
+		});
+		if (insertError) {
+			setError(insertError.message);
+			setSavingInstallment(false);
+			return;
+		}
 		setData((current) => ({
 			...current,
-			installments: [
-				...current.installments,
-				{ id: createId(), name, cardId: card.id, monthly, startMonth, endMonth },
-			],
+			installments: [...current.installments, item],
 		}));
+		setInstallmentDialog(false);
+		setSavingInstallment(false);
+	}
+
+	function updateInstallmentField(field, value) {
+		setInstallmentForm((current) => ({ ...current, [field]: value }));
 	}
 
 	function removeInstallment(itemId) {
@@ -338,7 +497,7 @@ export default function FinancialPlannerTool() {
 					planner_year: year,
 					name: item.name,
 					notes: item.notes || "",
-					monthly: Number(item.plan?.[0] || 0),
+					monthly: item.plan || normalizeMonthlyValues(null, 0),
 					updated_at: now,
 				})),
 			);
@@ -350,35 +509,9 @@ export default function FinancialPlannerTool() {
 					planner_year: year,
 					name: item.name,
 					notes: item.notes || "",
-					monthly: Number(item.plan?.[0] || 0),
+					monthly: item.plan || normalizeMonthlyValues(null, 0),
 					updated_at: now,
 				})),
-			);
-			await replace(
-				TABLES.incomeActuals,
-				data.income.flatMap((item) =>
-					PLANNER_MONTHS.map((_, month) => ({
-						user_id: user.id,
-						income_id: item.id,
-						planner_year: year,
-						planner_month: month + 1,
-						amount: Number(item.actual?.[month] || 0),
-						updated_at: now,
-					})),
-				),
-			);
-			await replace(
-				TABLES.deductionActuals,
-				data.deductions.flatMap((item) =>
-					PLANNER_MONTHS.map((_, month) => ({
-						user_id: user.id,
-						deduction_id: item.id,
-						planner_year: year,
-						planner_month: month + 1,
-						amount: Number(item.actual?.[month] || 0),
-						updated_at: now,
-					})),
-				),
 			);
 			await replace(
 				TABLES.installments,
@@ -390,10 +523,23 @@ export default function FinancialPlannerTool() {
 					name: item.name,
 					notes: item.notes || "",
 					monthly: Number(item.monthly || 0),
-					start_month: new Date(Date.UTC(year, item.startMonth, 1)).toISOString(),
-					end_month: new Date(Date.UTC(year, item.endMonth, 1)).toISOString(),
+					start_month: item.startDate || new Date(Date.UTC(year, item.startMonth, 1)).toISOString(),
+					end_month: item.endDate || new Date(Date.UTC(year, item.endMonth, 1)).toISOString(),
 					updated_at: now,
 				})),
+			);
+			await replace(
+				TABLES.installmentMonths,
+				data.installments.flatMap((item) =>
+					PLANNER_MONTHS.map((_, month) => ({
+						user_id: user.id,
+						installment_id: item.id,
+						planner_year: year,
+						planner_month: month + 1,
+						amount: Number(item.monthlyPlan?.[month] ?? item.monthly ?? 0),
+						updated_at: now,
+					})),
+				),
 			);
 			await replace(
 				TABLES.expenses,
@@ -416,7 +562,7 @@ export default function FinancialPlannerTool() {
 					planner_year: year,
 					planner_month: month + 1,
 					planned_amount: Number(item.plan?.[month] || 0),
-					actual_amount: Number(item.actual?.[month] || 0),
+					actual_amount: 0,
 					updated_at: now,
 				})),
 			);
@@ -436,11 +582,19 @@ export default function FinancialPlannerTool() {
 		return <Alert variant="destructive">{error}</Alert>;
 	}
 	return (
-		<div className="space-y-8">
-			<div className="flex flex-wrap items-end justify-between gap-4">
+		<div className="space-y-6">
+			<div className="flex flex-wrap items-end justify-between gap-4 rounded-2xl border border-border bg-gradient-to-br from-card to-secondary/30 p-5 shadow-lg shadow-black/10 sm:p-6">
 				<div>
-					<p className="text-sm text-muted-foreground">Annual budget and debt planner</p>
-					<h2 className="text-2xl font-semibold">{year} financial plan</h2>
+					<div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+						<Icons.Sparkles className="size-4" /> Your financial cockpit
+					</div>
+					<h2 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
+						{year} financial plan
+					</h2>
+					<p className="mt-2 max-w-xl text-sm text-muted-foreground">
+						Plan the year month by month, spot your cash-flow rhythm, and keep every payment in one
+						place.
+					</p>
 				</div>
 				<div className="flex items-center gap-2">
 					<select
@@ -452,23 +606,29 @@ export default function FinancialPlannerTool() {
 							<option key={option}>{option}</option>
 						))}
 					</select>
-					<Button type="button" onClick={save}>
-						{saving || "Save plan"}
+					<Button type="button" onClick={save} className="min-w-28">
+						{saving === "saving" ? <Icons.LoaderCircle className="size-4 animate-spin" /> : null}
+						{saving === "saving" ? "Saving..." : saving === "saved" ? "Saved" : "Save plan"}
 					</Button>
 				</div>
 			</div>
 			<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
 				{[
-					["Income", totals.income],
-					["Deductions", totals.deductions],
-					["Expenses", totals.expenses],
-					["Card payments", totals.installments],
-					["Net cash flow", totals.netPlan],
-				].map(([label, values]) => (
-					<Card key={label}>
+					["Income", totals.income, "text-emerald-300", Icons.TrendingUp],
+					["Deductions", totals.deductions, "text-amber-300", Icons.ArrowDownToLine],
+					["Expenses", totals.expenses, "text-rose-300", Icons.ShoppingBag],
+					["Card payments", totals.installments, "text-violet-300", Icons.CreditCard],
+					["Net cash flow", totals.netPlan, "text-primary", Icons.Activity],
+				].map(([label, values, tone, Icon]) => (
+					<Card key={label} className="border-border/80 bg-card/80">
 						<CardContent className="p-4">
-							<p className="text-xs text-muted-foreground">{label}</p>
-							<p className="mt-2 text-xl font-semibold">
+							<div className="flex items-center justify-between">
+								<p className="text-xs font-medium text-muted-foreground">{label}</p>
+								<Icon className={`size-4 ${tone}`} />
+							</div>
+							<p
+								className={`mt-2 text-xl font-semibold tabular-nums ${label === "Net cash flow" ? tone : ""}`}
+							>
 								{formatMoney(values.reduce((sum, value) => sum + value, 0))}
 							</p>
 						</CardContent>
@@ -480,15 +640,7 @@ export default function FinancialPlannerTool() {
 				rows={data.income}
 				field="plan"
 				onChange={(itemId, field, month, value) => updateRow("income", itemId, field, month, value)}
-				onAdd={() => addRow("income")}
-				onRemove={(itemId) => removeRow("income", itemId)}
-			/>
-			<AnnualTable
-				title="Actual income"
-				rows={data.income}
-				field="actual"
-				onChange={(itemId, field, month, value) => updateRow("income", itemId, field, month, value)}
-				onAdd={() => addRow("income")}
+				onAdd={() => openAddDialog("income")}
 				onRemove={(itemId) => removeRow("income", itemId)}
 			/>
 			<AnnualTable
@@ -498,17 +650,7 @@ export default function FinancialPlannerTool() {
 				onChange={(itemId, field, month, value) =>
 					updateRow("deductions", itemId, field, month, value)
 				}
-				onAdd={() => addRow("deductions")}
-				onRemove={(itemId) => removeRow("deductions", itemId)}
-			/>
-			<AnnualTable
-				title="Actual deductions"
-				rows={data.deductions}
-				field="actual"
-				onChange={(itemId, field, month, value) =>
-					updateRow("deductions", itemId, field, month, value)
-				}
-				onAdd={() => addRow("deductions")}
+				onAdd={() => openAddDialog("deductions")}
 				onRemove={(itemId) => removeRow("deductions", itemId)}
 			/>
 			<AnnualTable
@@ -518,28 +660,28 @@ export default function FinancialPlannerTool() {
 				onChange={(itemId, field, month, value) =>
 					updateRow("expenses", itemId, field, month, value)
 				}
-				onAdd={() => addRow("expenses")}
+				onAdd={() => openAddDialog("expenses")}
 				onRemove={(itemId) => removeRow("expenses", itemId)}
 			/>
-			<AnnualTable
-				title="Actual expenses"
-				rows={data.expenses}
-				field="actual"
-				onChange={(itemId, field, month, value) =>
-					updateRow("expenses", itemId, field, month, value)
-				}
-				onAdd={() => addRow("expenses")}
-				onRemove={(itemId) => removeRow("expenses", itemId)}
-			/>
-			<Card>
-				<CardHeader className="flex-row items-center justify-between gap-3">
-					<CardTitle>Credit-card payment schedule</CardTitle>
+			<Card className="overflow-hidden">
+				<CardHeader className="flex-row items-center justify-between gap-3 border-b border-border/70 bg-secondary/20">
+					<div className="flex items-center gap-3">
+						<div className="flex size-10 items-center justify-center rounded-xl bg-background text-violet-300">
+							<Icons.CreditCard className="size-5" />
+						</div>
+						<div>
+							<CardTitle>Credit-card payment schedule</CardTitle>
+							<p className="mt-1 text-xs text-muted-foreground">
+								See planned payments across the year
+							</p>
+						</div>
+					</div>
 					<Button type="button" size="sm" variant="outline" onClick={addInstallment}>
 						<Icons.Plus className="size-4" /> Add installment
 					</Button>
 				</CardHeader>
 				<CardContent className="space-y-4 overflow-x-auto">
-					<table className="min-w-[1100px] w-full text-sm">
+					<table className="min-w-[1100px] w-full text-sm tabular-nums">
 						<thead>
 							<tr className="border-b border-border text-left text-xs text-muted-foreground">
 								<th className="px-2 py-2">Card</th>
@@ -613,6 +755,160 @@ export default function FinancialPlannerTool() {
 					)}
 				</CardContent>
 			</Card>
+			<Dialog open={installmentDialog} onOpenChange={setInstallmentDialog}>
+				<DialogContent className="max-w-lg overflow-hidden border-border/80 bg-card p-0">
+					<DialogHeader className="mb-0 border-b border-border/70 bg-gradient-to-br from-secondary/60 to-card px-6 py-5">
+						<div className="mb-3 flex size-10 items-center justify-center rounded-xl bg-violet-400/10 text-violet-300">
+							<Icons.CreditCard className="size-5" />
+						</div>
+						<DialogTitle>Add installment</DialogTitle>
+						<p className="max-w-sm text-sm leading-5 text-muted-foreground">
+							Add a recurring card payment and define when it appears in your annual plan.
+						</p>
+					</DialogHeader>
+					<form
+						className="space-y-5 p-6"
+						onSubmit={(event) => {
+							event.preventDefault();
+							saveInstallment();
+						}}
+					>
+						<div className="space-y-2">
+							<Label htmlFor="installment-name">Name</Label>
+							<Input
+								id="installment-name"
+								value={installmentForm.name}
+								onChange={(event) => updateInstallmentField("name", event.target.value)}
+								required
+							/>
+						</div>
+						<div className="space-y-2">
+							<Label htmlFor="installment-card">Card</Label>
+							<select
+								id="installment-card"
+								value={installmentForm.cardId}
+								onChange={(event) => updateInstallmentField("cardId", event.target.value)}
+								className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/25"
+							>
+								{data.cards.map((card) => (
+									<option key={card.id} value={card.id}>
+										{card.name}
+									</option>
+								))}
+							</select>
+						</div>
+						<div className="grid grid-cols-2 gap-3 rounded-xl border border-border/70 bg-background/40 p-3">
+							<div className="space-y-2">
+								<Label htmlFor="installment-start">Start month</Label>
+								<Input
+									id="installment-start"
+									type="month"
+									value={installmentForm.startMonth}
+									onChange={(event) => updateInstallmentField("startMonth", event.target.value)}
+								/>
+							</div>
+							<div className="space-y-2">
+								<Label htmlFor="installment-end">End month</Label>
+								<Input
+									id="installment-end"
+									type="month"
+									value={installmentForm.endMonth}
+									onChange={(event) => updateInstallmentField("endMonth", event.target.value)}
+								/>
+							</div>
+						</div>
+						<div className="space-y-2">
+							<Label>Monthly payment schedule</Label>
+							<div className="max-h-56 space-y-2 overflow-y-auto rounded-xl border border-border/70 p-3">
+								{monthsBetween(installmentForm.startMonth, installmentForm.endMonth).map(
+									(entry) => (
+										<div key={entry.key} className="flex items-center justify-between gap-3">
+											<span className="text-sm">
+												{new Date(`${entry.key}-01T00:00:00Z`).toLocaleDateString("en", {
+													month: "long",
+													year: "numeric",
+													timeZone: "UTC",
+												})}
+											</span>
+											<Input
+												className="w-32"
+												inputMode="decimal"
+												value={installmentForm.monthlyPlan[entry.key] ?? installmentForm.monthly}
+												onChange={(event) =>
+													setInstallmentForm((current) => ({
+														...current,
+														monthlyPlan: {
+															...current.monthlyPlan,
+															[entry.key]: event.target.value,
+														},
+													}))
+												}
+												required
+											/>
+										</div>
+									),
+								)}
+							</div>
+						</div>
+						<div className="flex justify-end gap-2 border-t border-border/70 pt-4">
+							<Button type="button" variant="ghost" onClick={() => setInstallmentDialog(false)}>
+								Cancel
+							</Button>
+							<Button type="submit" disabled={savingInstallment}>
+								{savingInstallment ? <Icons.LoaderCircle className="size-4 animate-spin" /> : null}
+								{savingInstallment ? "Saving..." : "Add installment"}
+							</Button>
+						</div>
+					</form>
+				</DialogContent>
+			</Dialog>
+			<Dialog
+				open={addDialog.open}
+				onOpenChange={(open) => setAddDialog((current) => ({ ...current, open }))}
+			>
+				<DialogContent className="max-w-md overflow-hidden border-border/80 bg-card p-0">
+					<DialogHeader className="mb-0 border-b border-border/70 bg-gradient-to-br from-secondary/60 to-card px-6 py-5">
+						<div className="mb-3 flex size-10 items-center justify-center rounded-xl bg-emerald-400/10 text-emerald-300">
+							<Icons.Plus className="size-5" />
+						</div>
+						<DialogTitle>Add {addDialog.group} item</DialogTitle>
+						<p className="text-sm leading-5 text-muted-foreground">
+							Give this line item a name, then fill in the monthly plan from the table.
+						</p>
+					</DialogHeader>
+					<form
+						className="space-y-5 p-6"
+						onSubmit={(event) => {
+							event.preventDefault();
+							addRow(addDialog.group);
+						}}
+					>
+						<div className="space-y-2">
+							<Label htmlFor="planner-add-name">Name</Label>
+							<Input
+								id="planner-add-name"
+								autoFocus
+								value={addName}
+								onChange={(event) => setAddName(event.target.value)}
+								placeholder="e.g. Salary"
+								required
+							/>
+						</div>
+						<div className="flex justify-end gap-2 border-t border-border/70 pt-4">
+							<Button
+								type="button"
+								variant="ghost"
+								onClick={() => setAddDialog((current) => ({ ...current, open: false }))}
+							>
+								Cancel
+							</Button>
+							<Button type="submit">
+								<Icons.Plus className="size-4" /> Add item
+							</Button>
+						</div>
+					</form>
+				</DialogContent>
+			</Dialog>
 		</div>
 	);
 }

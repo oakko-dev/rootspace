@@ -4,6 +4,8 @@ import {
 	calculateAnnualTotals,
 	calculateCardTotals,
 	calculateDashboardTotals,
+	installmentMonthBounds,
+	monthsBetween,
 	monthIsActive,
 	normalizeMonthlyValues,
 } from "./financial-planner.js";
@@ -11,6 +13,21 @@ import {
 test("normalizes monthly values to twelve numeric months", () => {
 	assert.deepEqual(normalizeMonthlyValues([10, 20]), [10, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
 	assert.equal(normalizeMonthlyValues(null, 5).length, 12);
+});
+
+test("builds inclusive month ranges across calendar years", () => {
+	assert.deepEqual(
+		monthsBetween("2026-08", "2027-02").map((item) => item.key),
+		["2026-08", "2026-09", "2026-10", "2026-11", "2026-12", "2027-01", "2027-02"],
+	);
+	assert.deepEqual(
+		installmentMonthBounds({ start_month: "2026-08-01", end_month: "2027-02-01" }, 2027),
+		{
+			startMonth: 0,
+			endMonth: 1,
+			active: true,
+		},
+	);
 });
 
 test("calculates annual cash flow from income, deductions, expenses, and installments", () => {
