@@ -1,6 +1,8 @@
 "use client";
 
+import { DayPicker } from "@daypicker/react";
 import * as Icons from "lucide-react";
+import "@daypicker/react/style.css";
 import { useEffect, useMemo, useState } from "react";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -93,6 +95,50 @@ function MoneyInput(props) {
 			onBlur={handleBlur}
 			className={className}
 		/>
+	);
+}
+
+function MonthYearPicker({ id, label, value, onChange }) {
+	const [open, setOpen] = useState(false);
+	const selected = value ? new Date(`${value}-01T00:00:00Z`) : undefined;
+	return (
+		<div className="relative space-y-2">
+			<Label htmlFor={id}>{label}</Label>
+			<button
+				id={id}
+				type="button"
+				className="flex h-11 w-full items-center justify-between rounded-xl border border-input bg-background px-3 text-left text-sm outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
+				onClick={() => setOpen((current) => !current)}
+				aria-expanded={open}
+				aria-haspopup="dialog"
+			>
+				{selected?.toLocaleDateString("en", { month: "long", year: "numeric", timeZone: "UTC" }) ||
+					"Select month"}
+				<Icons.Calendar className="size-4 text-muted-foreground" aria-hidden="true" />
+			</button>
+			{open ? (
+				<dialog
+					open
+					className="absolute z-50 mt-2 rounded-xl border border-border bg-card p-3 shadow-xl"
+					aria-label={`${label} picker`}
+				>
+					<DayPicker
+						mode="single"
+						selected={selected}
+						defaultMonth={selected || new Date()}
+						captionLayout="dropdown"
+						fromYear={2000}
+						toYear={2100}
+						onSelect={(date) => {
+							if (date) {
+								onChange(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`);
+								setOpen(false);
+							}
+						}}
+					/>
+				</dialog>
+			) : null}
+		</div>
 	);
 }
 
@@ -799,21 +845,19 @@ export default function FinancialPlannerTool() {
 						</div>
 						<div className="grid grid-cols-2 gap-3 rounded-xl border border-border/70 bg-background/40 p-3">
 							<div className="space-y-2">
-								<Label htmlFor="installment-start">Start month</Label>
-								<Input
+								<MonthYearPicker
 									id="installment-start"
-									type="month"
+									label="Start month"
 									value={installmentForm.startMonth}
-									onChange={(event) => updateInstallmentField("startMonth", event.target.value)}
+									onChange={(value) => updateInstallmentField("startMonth", value)}
 								/>
 							</div>
 							<div className="space-y-2">
-								<Label htmlFor="installment-end">End month</Label>
-								<Input
+								<MonthYearPicker
 									id="installment-end"
-									type="month"
+									label="End month"
 									value={installmentForm.endMonth}
-									onChange={(event) => updateInstallmentField("endMonth", event.target.value)}
+									onChange={(value) => updateInstallmentField("endMonth", value)}
 								/>
 							</div>
 						</div>
