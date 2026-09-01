@@ -17,9 +17,9 @@ create table public.financial_planner_income (
   planner_year integer not null,
   name text not null,
   notes text not null default '',
-  monthly numeric(12, 2) not null default 0,
+  monthly jsonb not null default '0'::jsonb,
   updated_at timestamp with time zone not null default timezone('utc'::text, now()),
-  primary key (user_id, id)
+  primary key (user_id, id, planner_year)
 );
 
 create table public.financial_planner_deductions (
@@ -28,7 +28,7 @@ create table public.financial_planner_deductions (
   planner_year integer not null,
   name text not null,
   notes text not null default '',
-  monthly numeric(12, 2) not null default 0,
+  monthly jsonb not null default '0'::jsonb,
   updated_at timestamp with time zone not null default timezone('utc'::text, now()),
   primary key (user_id, id)
 );
@@ -71,8 +71,8 @@ create table public.financial_planner_income_actuals (
   amount numeric(12, 2) not null default 0,
   updated_at timestamp with time zone not null default timezone('utc'::text, now()),
   primary key (user_id, income_id, planner_year, planner_month),
-  foreign key (user_id, income_id)
-    references public.financial_planner_income (user_id, id)
+  foreign key (user_id, income_id, planner_year)
+    references public.financial_planner_income (user_id, id, planner_year)
     on delete cascade
 );
 

@@ -8,6 +8,9 @@ export const metadata = {
 	description: "Personal budget and installment tracker.",
 };
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function FinancialPlannerPage() {
 	const currentUser = await getCurrentUser();
 

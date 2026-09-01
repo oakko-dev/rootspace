@@ -119,23 +119,38 @@ export default function AppShell({ children }) {
 								const Icon = TOOL_ICONS[item.icon] || HelpCircle;
 
 								return (
-									<Link
-										key={item.href}
-										href={item.href}
-										className={cn(
-											"flex items-center gap-2 rounded-md px-2.5 py-2 font-medium transition-colors",
-											active
-												? "bg-primary text-primary-foreground"
-												: "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-										)}
-									>
-										<Icon
-											size={18}
-											strokeWidth={active ? 2.5 : 2}
-											className={active ? "text-primary-foreground" : "text-muted-foreground"}
-										/>
-										<span className="flex-1 truncate">{item.name}</span>
-									</Link>
+									<div key={item.href}>
+										<Link
+											href={item.href}
+											className={cn(
+												"flex items-center gap-2 rounded-md px-2.5 py-2 font-medium transition-colors",
+												active
+													? "bg-primary text-primary-foreground"
+													: "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+											)}
+										>
+											<Icon size={18} strokeWidth={active ? 2.5 : 2} />
+											<span className="flex-1 truncate">{item.name}</span>
+										</Link>
+										{item.children ? (
+											<div className="ml-8 space-y-1 border-l border-border pl-2">
+												{item.children.map((child) => (
+													<Link
+														key={child.href}
+														href={child.href}
+														className={cn(
+															"block rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
+															pathname === child.href
+																? "bg-primary/15 text-primary"
+																: "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+														)}
+													>
+														{child.name}
+													</Link>
+												))}
+											</div>
+										) : null}
+									</div>
 								);
 							})}
 						</div>
