@@ -252,6 +252,7 @@ async function loadYear(supabase, userId, year) {
 }
 
 function AnnualTable({ title, rows, field, onChange, onAdd, onRemove }) {
+	const [collapsed, setCollapsed] = useState(false);
 	const sectionMeta = {
 		Income: {
 			icon: Icons.TrendingUp,
@@ -274,7 +275,13 @@ function AnnualTable({ title, rows, field, onChange, onAdd, onRemove }) {
 	return (
 		<Card className="overflow-hidden">
 			<CardHeader className="flex-row items-center justify-between gap-3 border-b border-border/70 bg-secondary/20">
-				<div className="flex items-center gap-3">
+				<button
+					type="button"
+					className="flex min-h-11 flex-1 items-center gap-3 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+					aria-expanded={!collapsed}
+					aria-controls={`${title.toLowerCase().replaceAll(" ", "-")}-table`}
+					onClick={() => setCollapsed((value) => !value)}
+				>
 					<div
 						className={`flex size-10 items-center justify-center rounded-xl bg-background ${meta.tone}`}
 					>
@@ -284,12 +291,19 @@ function AnnualTable({ title, rows, field, onChange, onAdd, onRemove }) {
 						<CardTitle>{title}</CardTitle>
 						<p className="mt-1 text-xs text-muted-foreground">{meta.description}</p>
 					</div>
-				</div>
+					<Icons.ChevronDown
+						className={`ml-auto size-4 text-muted-foreground transition-transform duration-200 ${collapsed ? "-rotate-90" : ""}`}
+						aria-hidden="true"
+					/>
+				</button>
 				<Button type="button" size="sm" variant="outline" onClick={onAdd}>
 					<Icons.Plus className="size-4" /> Add row
 				</Button>
 			</CardHeader>
-			<CardContent className="overflow-x-auto p-0">
+			<CardContent
+				id={`${title.toLowerCase().replaceAll(" ", "-")}-table`}
+				className={`overflow-x-auto p-0 transition-[max-height,opacity] duration-200 ${collapsed ? "max-h-0 opacity-0" : "max-h-[1000px] opacity-100"}`}
+			>
 				<table className="min-w-[1100px] w-full text-sm">
 					<thead className="border-y border-border bg-muted/30 text-left text-xs text-muted-foreground">
 						<tr>
@@ -360,6 +374,7 @@ export default function FinancialPlannerTool() {
 	const [addName, setAddName] = useState("");
 	const [installmentDialog, setInstallmentDialog] = useState(false);
 	const [savingInstallment, setSavingInstallment] = useState(false);
+	const [collapsedInstallments, setCollapsedInstallments] = useState(false);
 	const [installmentForm, setInstallmentForm] = useState({
 		name: "",
 		cardId: "",
@@ -744,22 +759,37 @@ export default function FinancialPlannerTool() {
 			/>
 			<Card className="overflow-hidden">
 				<CardHeader className="flex-row items-center justify-between gap-3 border-b border-border/70 bg-secondary/20">
-					<div className="flex items-center gap-3">
-						<div className="flex size-10 items-center justify-center rounded-xl bg-background text-violet-300">
-							<Icons.CreditCard className="size-5" />
+					<button
+						type="button"
+						className="flex min-h-11 flex-1 items-center gap-3 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+						aria-expanded={!collapsedInstallments}
+						aria-controls="credit-card-payment-schedule"
+						onClick={() => setCollapsedInstallments((value) => !value)}
+					>
+						<div className="flex items-center gap-3">
+							<div className="flex size-10 items-center justify-center rounded-xl bg-background text-violet-300">
+								<Icons.CreditCard className="size-5" />
+							</div>
+							<div>
+								<CardTitle>Credit-card payment schedule</CardTitle>
+								<p className="mt-1 text-xs text-muted-foreground">
+									See planned payments across the year
+								</p>
+							</div>
 						</div>
-						<div>
-							<CardTitle>Credit-card payment schedule</CardTitle>
-							<p className="mt-1 text-xs text-muted-foreground">
-								See planned payments across the year
-							</p>
-						</div>
-					</div>
+						<Icons.ChevronDown
+							className={`ml-auto size-4 text-muted-foreground transition-transform duration-200 ${collapsedInstallments ? "-rotate-90" : ""}`}
+							aria-hidden="true"
+						/>
+					</button>
 					<Button type="button" size="sm" variant="outline" onClick={addInstallment}>
 						<Icons.Plus className="size-4" /> Add installment
 					</Button>
 				</CardHeader>
-				<CardContent className="space-y-4 overflow-x-auto">
+				<CardContent
+					id="credit-card-payment-schedule"
+					className={`space-y-4 overflow-x-auto transition-[max-height,opacity] duration-200 ${collapsedInstallments ? "max-h-0 overflow-hidden p-0 opacity-0" : "max-h-[1600px] opacity-100"}`}
+				>
 					<table className="min-w-[1100px] w-full text-sm tabular-nums">
 						<thead>
 							<tr className="border-b border-border text-left text-xs text-muted-foreground">

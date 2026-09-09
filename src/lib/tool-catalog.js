@@ -5,6 +5,7 @@ export const toolCatalog = [
 		description: "Synced collections and links for your browser start page.",
 		href: "/",
 		icon: "PanelsTopLeft",
+		group: "Workspace",
 		authRequired: true,
 	},
 	{
@@ -13,6 +14,7 @@ export const toolCatalog = [
 		description: "ISO, UTC, local time, Unix seconds, and Unix milliseconds.",
 		href: "/date-converter",
 		icon: "Calendar",
+		group: "Utilities",
 	},
 	{
 		name: "Thai name generator",
@@ -20,6 +22,7 @@ export const toolCatalog = [
 		description: "Random Thai first name, last name, and nickname.",
 		href: "/thai-name-generator",
 		icon: "User",
+		group: "Utilities",
 	},
 	{
 		name: "JSON formatter",
@@ -27,6 +30,7 @@ export const toolCatalog = [
 		description: "Pretty-print or minify JSON with explicit actions.",
 		href: "/json-formatter",
 		icon: "FileJson",
+		group: "Utilities",
 	},
 	{
 		name: "Financial planner",
@@ -34,6 +38,7 @@ export const toolCatalog = [
 		description: "Budget snapshots, income tracking, and monthly planning.",
 		href: "/financial-planner",
 		icon: "Wallet",
+		group: "Finance",
 		authRequired: true,
 		children: [
 			{ name: "Dashboard", href: "/financial-planner/dashboard" },
