@@ -94,6 +94,42 @@ export default function ThaiNameGeneratorTool() {
 					<CardContent className="p-3">
 						<div className="flex items-start justify-between gap-3">
 							<p className="font-mono text-xs font-semibold uppercase text-muted-foreground">
+								First name
+							</p>
+							<CopyButton
+								copied={copiedKey === "thai-firstname"}
+								label="Copy first name"
+								onClick={() => handleCopy("thai-firstname", thaiName?.firstname ?? "")}
+								disabled={!thaiName?.firstname}
+							/>
+						</div>
+						<p className="mt-2 break-words font-mono text-sm text-foreground">
+							{thaiName?.firstname ?? "-"}
+						</p>
+					</CardContent>
+				</Card>
+				<Card>
+					<CardContent className="p-3">
+						<div className="flex items-start justify-between gap-3">
+							<p className="font-mono text-xs font-semibold uppercase text-muted-foreground">
+								Last name
+							</p>
+							<CopyButton
+								copied={copiedKey === "thai-lastname"}
+								label="Copy last name"
+								onClick={() => handleCopy("thai-lastname", thaiName?.lastname ?? "")}
+								disabled={!thaiName?.lastname}
+							/>
+						</div>
+						<p className="mt-2 break-words font-mono text-sm text-foreground">
+							{thaiName?.lastname ?? "-"}
+						</p>
+					</CardContent>
+				</Card>
+				<Card>
+					<CardContent className="p-3">
+						<div className="flex items-start justify-between gap-3">
+							<p className="font-mono text-xs font-semibold uppercase text-muted-foreground">
 								Nickname
 							</p>
 							<CopyButton
