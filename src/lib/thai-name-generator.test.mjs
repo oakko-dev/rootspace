@@ -24,6 +24,11 @@ test("generates a female thai name when random picks the female branch", () => {
 		nickname: "มิ้น",
 		fullName: "มะลิ ใจดี",
 		displayName: "มะลิ ใจดี (มิ้น)",
+		firstnameEn: "Mali",
+		lastnameEn: "Jaidee",
+		nicknameEn: "Mint",
+		fullNameEn: "Mali Jaidee",
+		displayNameEn: "Mali Jaidee (Mint)",
 	});
 });
 
@@ -38,6 +43,11 @@ test("generates a male thai name when random picks the male branch", () => {
 		nickname: "นัท",
 		fullName: "นนท์ แสงทอง",
 		displayName: "นนท์ แสงทอง (นัท)",
+		firstnameEn: "Non",
+		lastnameEn: "Saengthong",
+		nicknameEn: "Nat",
+		fullNameEn: "Non Saengthong",
+		displayNameEn: "Non Saengthong (Nat)",
 	});
 });
 
@@ -57,4 +67,17 @@ test("throws when a required list is missing", () => {
 	assert.throws(() => generateThaiName({ ...sampleData, lastname: [] }), {
 		message: "Missing required thai name data.",
 	});
+});
+
+test("every entry in the name list has a thai and english spelling", async () => {
+	const { readFile } = await import("node:fs/promises");
+	const data = JSON.parse(
+		await readFile(new URL("../../public/thai-names.json", import.meta.url), "utf-8"),
+	);
+
+	for (const [list, entries] of Object.entries(data)) {
+		for (const entry of entries) {
+			assert.ok(entry.th?.trim() && entry.en?.trim(), `${list}: ${JSON.stringify(entry)}`);
+		}
+	}
 });

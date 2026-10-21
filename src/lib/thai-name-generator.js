@@ -20,10 +20,17 @@ export function generateThaiName(data, random = Math.random) {
 		throw new Error("Missing required thai name data.");
 	}
 
-	const firstname = pickRandom(firstnames, random).th.trim();
-	const lastname = pickRandom(lastnames, random).th.trim();
-	const nickname = pickRandom(nicknames, random).th.trim();
+	const firstnameEntry = pickRandom(firstnames, random);
+	const lastnameEntry = pickRandom(lastnames, random);
+	const nicknameEntry = pickRandom(nicknames, random);
+	const firstname = firstnameEntry.th.trim();
+	const lastname = lastnameEntry.th.trim();
+	const nickname = nicknameEntry.th.trim();
+	const firstnameEn = firstnameEntry.en.trim();
+	const lastnameEn = lastnameEntry.en.trim();
+	const nicknameEn = nicknameEntry.en.trim();
 	const fullName = `${firstname} ${lastname}`;
+	const fullNameEn = `${firstnameEn} ${lastnameEn}`;
 
 	return {
 		citizenNumber: generateThaiCitizenNumber(random),
@@ -33,5 +40,10 @@ export function generateThaiName(data, random = Math.random) {
 		nickname,
 		fullName,
 		displayName: `${fullName} (${nickname})`,
+		firstnameEn,
+		lastnameEn,
+		nicknameEn,
+		fullNameEn,
+		displayNameEn: `${fullNameEn} (${nicknameEn})`,
 	};
 }
