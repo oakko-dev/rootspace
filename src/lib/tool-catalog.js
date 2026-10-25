@@ -9,6 +9,15 @@ export const toolCatalog = [
 		authRequired: true,
 	},
 	{
+		name: "Notes",
+		status: "Ready",
+		description: "Plain-text notes saved to your account.",
+		href: "/notes",
+		icon: "NotebookPen",
+		group: "Workspace",
+		authRequired: true,
+	},
+	{
 		name: "Date converter",
 		status: "Ready",
 		description: "ISO, UTC, local time, Unix seconds, and Unix milliseconds.",

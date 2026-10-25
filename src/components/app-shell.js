@@ -6,6 +6,7 @@ import {
 	HelpCircle,
 	LogIn,
 	LogOut,
+	NotebookPen,
 	PanelsTopLeft,
 	User,
 	Wallet,
@@ -29,7 +30,7 @@ import {
 import { toolCatalog } from "@/lib/tool-catalog";
 import { cn } from "@/lib/utils";
 
-const TOOL_ICONS = { Calendar, FileJson, PanelsTopLeft, User, Wallet };
+const TOOL_ICONS = { Calendar, FileJson, NotebookPen, PanelsTopLeft, User, Wallet };
 
 export default function AppShell({ children }) {
 	const pathname = usePathname();
