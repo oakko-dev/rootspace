@@ -6,6 +6,7 @@ import {
 	calculateDashboardTotals,
 	installmentMonthBounds,
 	installmentIsComplete,
+	installmentProgress,
 	monthsBetween,
 	monthIsActive,
 	normalizeMonthlyValues,
@@ -111,4 +112,11 @@ test("calculates dashboard totals from variable monthly amounts and payment stat
 	assert.equal(card.expected, 120);
 	assert.equal(card.paid, 0);
 	assert.equal(card.items[0].month.amount, 120);
+});
+
+test("finds the installment number for a month across years", () => {
+	const item = { start_month: "2025-11-01", end_month: "2026-08-01" };
+	assert.deepEqual(installmentProgress(item, 2025, 10), { current: 1, total: 10 });
+	assert.deepEqual(installmentProgress(item, 2026, 2), { current: 5, total: 10 });
+	assert.equal(installmentProgress(item, 2026, 9), null);
 });

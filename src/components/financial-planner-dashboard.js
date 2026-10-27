@@ -10,6 +10,7 @@ import {
 	calculateDashboardTotals,
 	installmentMonthBounds,
 	installmentIsComplete,
+	installmentProgress,
 	PLANNER_MONTHS,
 } from "@/lib/financial-planner";
 import { formatMoneyInput } from "@/lib/money-input";
@@ -245,6 +246,7 @@ export default function FinancialPlannerDashboard() {
 						<CardContent className="space-y-3 p-4">
 							{card.items.map((entry) => {
 								const item = entry;
+								const progress = installmentProgress(item, year, month);
 								return (
 									<div
 										key={item.id}
@@ -253,7 +255,9 @@ export default function FinancialPlannerDashboard() {
 										<div>
 											<p className="font-medium">{item.name}</p>
 											<p className="text-xs text-muted-foreground">
-												Installment {item.startMonth + 1}–{item.endMonth + 1}
+												{progress
+													? `Installment ${progress.current} of ${progress.total} · ${PLANNER_MONTHS[month]} ${year}`
+													: `${PLANNER_MONTHS[month]} ${year}`}
 											</p>
 										</div>
 										<p className="font-semibold tabular-nums">{amount(item.month.amount)}</p>

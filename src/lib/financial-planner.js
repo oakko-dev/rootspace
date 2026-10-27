@@ -55,6 +55,16 @@ export function installmentMonthBounds(item, year) {
 	};
 }
 
+// Which installment number falls on the given month, e.g. { current: 3, total: 10 }.
+export function installmentProgress(item, year, monthIndex) {
+	const months = monthsBetween(
+		new Date(item.start_month || item.startDate).toISOString().slice(0, 7),
+		new Date(item.end_month || item.endDate).toISOString().slice(0, 7),
+	);
+	const index = months.findIndex((entry) => entry.year === year && entry.month === monthIndex);
+	return index === -1 ? null : { current: index + 1, total: months.length };
+}
+
 export function installmentIsComplete(item, paidByMonth) {
 	return monthsBetween(
 		new Date(item.start_month || item.startDate).toISOString().slice(0, 7),
