@@ -51,3 +51,13 @@ test("returns a validation error for invalid input", () => {
 		error: "Could not parse that date.",
 	});
 });
+
+test("reads a 25xx leading year as Buddhist Era and outputs a Thai date", () => {
+	const result = convertDateInput("2567-01-02T03:04:05.000Z");
+
+	assert.equal(result.ok, true);
+	assert.equal(result.inputType, "buddhist era date");
+	assert.equal(result.iso, "2024-01-02T03:04:05.000Z");
+	assert.equal(result.buddhistYear, 2567);
+	assert.match(result.thai, /2567/u);
+});

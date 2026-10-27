@@ -7,7 +7,21 @@ test("live tools expose dedicated sidebar routes with bookmarks as home", () => 
 
 	assert.deepEqual(
 		liveTools.map((tool) => tool.href),
-		["/", "/notes", "/date-converter", "/thai-name-generator", "/json-formatter", "/financial-planner"],
+		[
+			"/",
+			"/notes",
+			"/date-converter",
+			"/thai-name-generator",
+			"/json-formatter",
+			"/id-generator",
+			"/encode-decode",
+			"/jwt-decoder",
+			"/hash-generator",
+			"/password-generator",
+			"/thai-id-validator",
+			"/baht-text",
+			"/financial-planner",
+		],
 	);
 	assert.equal(
 		toolCatalog.find((tool) => tool.name === "Financial planner").children[0].name,

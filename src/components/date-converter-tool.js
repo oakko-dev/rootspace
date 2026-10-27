@@ -20,6 +20,8 @@ export default function DateConverterTool() {
 		? [
 				["Input type", result.inputType],
 				["Local", result.local],
+				["Thai (B.E.)", result.thai],
+				["Buddhist year", result.buddhistYear],
 				["UTC", result.utc],
 				["ISO", result.iso],
 				["Unix seconds", result.unixSeconds],
@@ -43,7 +45,8 @@ export default function DateConverterTool() {
 				<CardHeader>
 					<CardTitle>Date converter</CardTitle>
 					<CardDescription>
-						Parse ISO dates, natural date text, and Unix timestamps.
+						Parse ISO dates, natural date text, Unix timestamps, and Buddhist Era dates like
+						2567-01-02.
 					</CardDescription>
 				</CardHeader>
 				<CardContent className="space-y-4">

@@ -1,9 +1,16 @@
 "use client";
 
 import {
+	Banknote,
+	Binary,
 	Calendar,
 	FileJson,
+	FingerprintPattern,
+	Hash,
 	HelpCircle,
+	IdCard,
+	KeyRound,
+	LockKeyhole,
 	LogIn,
 	LogOut,
 	NotebookPen,
@@ -30,7 +37,21 @@ import {
 import { toolCatalog } from "@/lib/tool-catalog";
 import { cn } from "@/lib/utils";
 
-const TOOL_ICONS = { Calendar, FileJson, NotebookPen, PanelsTopLeft, User, Wallet };
+const TOOL_ICONS = {
+	Banknote,
+	Binary,
+	Calendar,
+	FileJson,
+	FingerprintPattern,
+	Hash,
+	IdCard,
+	KeyRound,
+	LockKeyhole,
+	NotebookPen,
+	PanelsTopLeft,
+	User,
+	Wallet,
+};
 
 export default function AppShell({ children }) {
 	const pathname = usePathname();
