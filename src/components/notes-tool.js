@@ -61,7 +61,7 @@ export default function NotesTool() {
 	const [error, setError] = useState("");
 	const [status, setStatus] = useState("Saved");
 	const [confirmingDelete, setConfirmingDelete] = useState(false);
-	const [previewing, setPreviewing] = useState(false);
+	const [previewing, setPreviewing] = useState(true);
 	const bodyRef = useRef(null);
 	const dirtyIds = useRef(new Set());
 
@@ -156,6 +156,7 @@ export default function NotesTool() {
 		dirtyIds.current.add(note.id);
 		setNotes((current) => [note, ...current]);
 		setActiveId(note.id);
+		setPreviewing(false);
 		setQuery("");
 	}
 

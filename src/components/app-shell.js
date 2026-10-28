@@ -1,14 +1,12 @@
 "use client";
 
 import {
-	Banknote,
 	Binary,
 	Calendar,
 	FileJson,
 	FingerprintPattern,
 	Hash,
 	HelpCircle,
-	IdCard,
 	KeyRound,
 	LockKeyhole,
 	LogIn,
@@ -36,17 +34,15 @@ import {
 	parseBookmarkBoardUser,
 	readBookmarkBoardUser,
 } from "@/lib/bookmark-board-user";
-import { toolCatalog } from "@/lib/tool-catalog";
+import { GUEST_HOME_HREF, toolCatalog } from "@/lib/tool-catalog";
 import { cn } from "@/lib/utils";
 
 const TOOL_ICONS = {
-	Banknote,
 	Binary,
 	Calendar,
 	FileJson,
 	FingerprintPattern,
 	Hash,
-	IdCard,
 	KeyRound,
 	LockKeyhole,
 	NotebookPen,
@@ -84,7 +80,10 @@ export default function AppShell({ children }) {
 	const [mobileMenuPath, setMobileMenuPath] = useState(null);
 	const mobileMenuOpen = mobileMenuPath === pathname;
 	const isBookmarkPage = pathname === "/" || pathname === "/start-page";
-	const liveTools = toolCatalog.filter((tool) => tool.status === "Ready");
+	// Guests only see tools that work without an account.
+	const liveTools = toolCatalog.filter(
+		(tool) => tool.status === "Ready" && (currentUser || !tool.authRequired),
+	);
 	const navGroups = [];
 	for (const tool of liveTools) {
 		const groupName = tool.group || "Tools";
@@ -223,7 +222,7 @@ export default function AppShell({ children }) {
 							</div>
 							<div className="min-w-0 flex-1">
 								<Link
-									href="/"
+									href={currentUser ? "/" : GUEST_HOME_HREF}
 									className={cn(
 										"block truncate rounded-sm text-[15px] font-bold tracking-tight hover:text-primary",
 										FOCUS_RING,

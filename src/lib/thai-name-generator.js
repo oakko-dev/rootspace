@@ -1,12 +1,13 @@
-import { thaiCitizenChecksum } from "./thai-citizen-id.js";
-
 function pickRandom(list, random) {
 	return list[Math.floor(random() * list.length)];
 }
 
 function generateThaiCitizenNumber(random) {
 	const baseDigits = Array.from({ length: 12 }, () => Math.floor(random() * 10));
-	return [...baseDigits, thaiCitizenChecksum(baseDigits)].join("");
+	const weightedSum = baseDigits.reduce((sum, digit, index) => sum + digit * (13 - index), 0);
+	const checksum = (11 - (weightedSum % 11)) % 10;
+
+	return [...baseDigits, checksum].join("");
 }
 
 export function generateThaiName(data, random = Math.random) {

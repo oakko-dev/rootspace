@@ -82,22 +82,6 @@ export const toolCatalog = [
 		group: "Utilities",
 	},
 	{
-		name: "Thai ID validator",
-		status: "Ready",
-		description: "Check the digit of a 13-digit Thai citizen ID.",
-		href: "/thai-id-validator",
-		icon: "IdCard",
-		group: "Utilities",
-	},
-	{
-		name: "Baht text",
-		status: "Ready",
-		description: "Amounts written in Thai words, like BAHTTEXT.",
-		href: "/baht-text",
-		icon: "Banknote",
-		group: "Utilities",
-	},
-	{
 		name: "Financial planner",
 		status: "Ready",
 		description: "Budget snapshots, income tracking, and monthly planning.",
@@ -119,3 +103,8 @@ export const toolCatalog = [
 		icon: "History",
 	},
 ];
+
+// Where logged-out visitors land instead of the bookmark home page.
+export const GUEST_HOME_HREF = toolCatalog.find(
+	(tool) => tool.status === "Ready" && !tool.authRequired,
+).href;

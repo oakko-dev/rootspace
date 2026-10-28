@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { toolCatalog } from "./tool-catalog.js";
+import { GUEST_HOME_HREF, toolCatalog } from "./tool-catalog.js";
+
+test("guests land on the first tool that needs no account", () => {
+	assert.equal(GUEST_HOME_HREF, "/date-converter");
+});
 
 test("live tools expose dedicated sidebar routes with bookmarks as home", () => {
 	const liveTools = toolCatalog.filter((tool) => tool.status === "Ready");
@@ -18,8 +22,6 @@ test("live tools expose dedicated sidebar routes with bookmarks as home", () => 
 			"/jwt-decoder",
 			"/hash-generator",
 			"/password-generator",
-			"/thai-id-validator",
-			"/baht-text",
 			"/financial-planner",
 		],
 	);
